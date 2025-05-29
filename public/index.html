@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>单词学习</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; }
+    #options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2%;
+  justify-content: space-between;
+}
+
+button.option {
+  flex: 0 1 23%;  /* 占宽约1/4（加gap更自然） */
+  box-sizing: border-box;
+  padding: 10px;
+  word-wrap: break-word;
+  white-space: normal;
+  text-align: center;
+  border-radius: 1rem;
+  font-size:1rem;
+  margin-bottom:3rem;
+}
+
+button.option.correct {
+  border: 2px solid #28a745;
+  background-color: #e8f5e9;
+  position: relative;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+button.option.correct::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid #28a745;
+  border-radius: 1rem;
+  opacity: 0.6;
+  animation: pulseOutGreen 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+button.option.wrong {
+  border: 2px solid #dc3545;
+  background-color: #f8d7da;
+  position: relative;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+button.option.wrong::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid #dc3545;
+  border-radius: 1rem;
+  opacity: 0.6;
+  animation: pulseOutRed 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes pulseOutGreen {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+@keyframes pulseOutRed {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+
+button.option.selected::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid #007bff;
+  border-radius: 1rem;
+  opacity: 0.6;
+  animation: pulseOut 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes pulseOut {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+    border-radius:1rem;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;border-radius:1rem;
+  }
+}
+
+#nav-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+button.option:hover ,button.option.hover {
+  background-color:  rgba(0, 123, 255, 0.3);
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+}
+
+
+.nav-button {
+  background-color: #f0f0f0;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  padding: 0.6em 1.2em;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #007bff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#word {
+  text-align: center;
+  font-size: 3rem;
+  margin-top:2rem;
+  margin-bottom: 5rem;
+}
+
+
+.nav-button:hover,.nav-button.hover,
+.nav-button:focus  {
+  background-color: #007bff;
+  color: white;
+  transform: scale(1.05);
+}
+
+.nav-button:active {
+  transform: scale(0.97);
+}
+
+    .hidden { display: none; }
+    .learned { color: green; font-weight: bold; }
+    #progress-bar div { height: 20px; }
+  </style>
+</head>
+<body>
+  
+  <h2 id="word">加载中...</h2>
+  <div id="options"></div>
+  <div id="feedback" class="hidden"></div>
+  <div id="nav-buttons">
+    <button class="nav-button" onclick="prevWord()">⬅️ 上一个单词</button>
+    <button class="nav-button" onclick="nextWord()">下一个单词 ➡️</button>
+  </div>
+  
+  <div style="margin-top:2rem"></div>
+  <div id="progress-bar" style="display: flex; gap: 2px; margin-top: 30px; border-radius: 10rem; overflow: hidden;"></div>
+
+<!-- 状态与模式选择 -->
+<div id="status-mode" style="display: flex; justify-content: space-between; font-size: 1rem; margin-top: 1rem;">
+  <div id="status">已学会：0/0</div>
+  <label>
+    模式选择：
+    <select id="modeSelector" onchange="switchMode()">
+      <option value="learn">🧠 学习模式</option>
+      <option value="review">📘 复习模式</option>
+    </select>
+  </label>
+</div>
+
+  <script>
+    let words = [];
+    let index = 0;
+    let batchSize = 20;
+    let currentBatchStart = 0;
+    let progress = {};
+    let reviewProgress = {};
+    let mode = 'learn';
+    
+    const PROGRESS_KEY = "wordProgress";
+    const REVIEW_KEY = "reviewProgress";
+    
+    function saveProgress() {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
+    
+    function saveReviewProgress() {
+      localStorage.setItem(REVIEW_KEY, JSON.stringify(reviewProgress));
+    }
+    
+    function loadProgress() {
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      if (raw) progress = JSON.parse(raw);
+    }
+    
+    function loadReviewProgress() {
+      const raw = localStorage.getItem(REVIEW_KEY);
+      if (raw) reviewProgress = JSON.parse(raw);
+    }
+    
+    function initializeProgress(data) {
+      if (!progress) progress = {};
+      data.forEach(w => {
+        if (!(w.单词 in progress)) progress[w.单词] = { streak: 0 };
+      });
+    }
+    
+    fetch("/api/words").then(res => res.json()).then(data => {
+      words = data;
+      loadProgress();
+      loadReviewProgress();
+      initializeProgress(data);
+      renderWord();
+    });
+    
+    function shuffle(arr) {
+  // Fisher-Yates shuffle
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function getWordsToStudy() {
+  if (mode === 'learn') {
+    const batch = words.slice(currentBatchStart, currentBatchStart + batchSize);
+    const unlearned = batch.filter(w => progress[w.单词].streak < 3);
+    shuffle(unlearned);
+    return unlearned;
+  } else {
+    const reviewing = words.filter(w =>
+      progress[w.单词]?.streak >= 3 && (reviewProgress[w.单词]?.review ?? 0) > 0
+    );
+    shuffle(reviewing);
+    return reviewing;
+  }
+}
+
+    
+function renderWord() {
+  const list = getWordsToStudy();
+
+  const learnedCount = Object.values(progress).filter(p => p.streak >= 3).length;
+  const totalCount = words.length;
+  const reviewedCount = words.filter(w =>
+    progress[w.单词]?.streak >= 3 && (reviewProgress[w.单词]?.review ?? 0) === 0
+  ).length;
+
+  if (list.length === 0) {
+    if (mode === 'learn') {
+      if (currentBatchStart + batchSize >= totalCount) {
+        document.getElementById("status").innerHTML = `🎉 所有单词已学完！（共 ${learnedCount}/${totalCount}）`;
+        document.getElementById("word").textContent = "";
+        
+        document.getElementById("options").innerHTML = "";
+        document.getElementById("feedback").classList.add("hidden");
+        return;
+      } else {
+        currentBatchStart += batchSize;
+        index = 0;
+        renderWord();
+        return;
+      }
+    } else {
+      document.getElementById("status").innerHTML = `✅ 复习完成！（共复习 ${reviewedCount}/${totalCount}）`;
+      document.getElementById("word").textContent = "";
+      document.getElementById("options").innerHTML = "";
+      document.getElementById("feedback").classList.add("hidden");
+      return;
+    }
+  }
+
+  const word = list[index % list.length];
+  document.getElementById("word").textContent = word.单词;
+  const wordText = document.getElementById("word");
+wordText.innerHTML = `${word.单词} <button id="speakBtn" style="font-size: 0.6em;">🔊</button>`;
+
+document.getElementById("speakBtn").onclick = () => {
+  speakWord(word.单词);
+};
+
+  document.getElementById("word").dataset.correct = word.单词释义;
+  document.getElementById("feedback").classList.add("hidden");
+
+  const correct = word.单词释义;
+  let options = [correct];
+  while (options.length < 4) {
+    let rand = words[Math.floor(Math.random() * words.length)].单词释义;
+    if (!options.includes(rand)) options.push(rand);
+  }
+  options.sort(() => Math.random() - 0.5);
+
+  const container = document.getElementById("options");
+  container.innerHTML = "";
+  options.forEach((opt, i) => {
+    const btn = document.createElement("button");
+    btn.className = "option";
+    btn.textContent = opt;
+    btn.onclick = () => {
+      const isCorrect = opt === correct;
+      highlightOption(i, isCorrect);
+      handleAnswer(isCorrect, word);
+    };
+    container.appendChild(btn);
+  });
+
+  document.getElementById("status").textContent =
+    mode === 'learn'
+      ? `已学会：${learnedCount}/${totalCount}`
+      : `复习中：${list.length} 个单词`;
+
+  renderProgressBar();
+  speakWord(word.单词);
+
+}
+
+function handleAnswer(isCorrect, word) {
+  const feedback = document.getElementById("feedback");
+  const audio = new Audio(isCorrect ? "/correct.wav" : "/wrong.wav");
+  audio.play();
+
+  if (isCorrect) {
+    if (mode === 'learn') {
+      progress[word.单词].streak++;
+      if (progress[word.单词].streak > 3) progress[word.单词].streak = 3;
+      saveProgress();
+    } else {
+      if (!reviewProgress[word.单词]) reviewProgress[word.单词] = { review: 1 };
+      reviewProgress[word.单词].review--;
+      if (reviewProgress[word.单词].review < 0) reviewProgress[word.单词].review = 0;
+      saveReviewProgress();
+    }
+    feedback.textContent = `✅ 正确！联想法：${word.单词联想背诵法}`;
+  } else {
+    if (mode === 'learn') {
+      progress[word.单词].streak = 0;
+      saveProgress();
+    } else {
+      reviewProgress[word.单词] = { review: 3 };
+      saveReviewProgress();
+    }
+    feedback.textContent = `❌ 错误！联想法：${word.单词联想背诵法}`;
+  }
+
+  feedback.classList.remove("hidden");
+}
+
+function speakWord(text) {
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "en-US";
+  speechSynthesis.speak(utter);
+}
+
+    
+    function nextWord() {
+      index++;
+      renderWord();
+    }
+    
+    function prevWord() {
+      const list = getWordsToStudy();
+      index = (index - 1 + list.length) % list.length;
+      renderWord();
+    }
+    
+    function switchMode() {
+      mode = document.getElementById("modeSelector").value;
+      index = 0;
+      currentBatchStart = 0;
+    
+      if (mode === 'review') {
+        words.forEach(w => {
+          if (progress[w.单词]?.streak >= 3 && !(w.单词 in reviewProgress)) {
+            reviewProgress[w.单词] = { review: 1 };
+          }
+        });
+        saveReviewProgress();
+      }
+    
+      renderWord();
+    }
+    
+    function renderProgressBar() {
+      const bar = document.getElementById("progress-bar");
+      bar.innerHTML = "";
+    
+      let total = words.length;
+      let learned = 0;
+      let learning = 0;
+    
+      if (mode === 'learn') {
+        words.forEach(w => {
+          let s = progress[w.单词]?.streak ?? 0;
+          if (s >= 3) learned++;
+          else if (s > 0) learning++;
+        });
+      } else {
+        words.forEach(w => {
+          if (progress[w.单词]?.streak >= 3) {
+            let r = reviewProgress[w.单词]?.review ?? 0;
+            if (r === 0) learned++;
+            else learning++;
+          }
+        });
+      }
+    
+      let learnedPct = (learned / total) * 100;
+      let learningPct = (learning / total) * 100;
+      let unlearnedPct = 100 - learnedPct - learningPct;
+    
+      const addSegment = (color, width) => {
+        const div = document.createElement("div");
+        div.style.width = `${width}%`;
+        div.style.height = "20px";
+        div.style.backgroundColor = color;
+        bar.appendChild(div);
+      };
+    
+      addSegment("#007bff", learnedPct);   // 蓝色：已学会
+      addSegment("#ffc107", learningPct);  // 黄色：正在学
+      addSegment("#ccc", unlearnedPct);    // 灰色：未学
+    }
+    
+    function highlightOption(index, isCorrect) {
+      const options = document.querySelectorAll("#options button.option");
+      options.forEach(btn => btn.classList.remove("correct", "wrong"));
+    
+      if (options[index]) {
+        options[index].classList.add(isCorrect ? "correct" : "wrong");
+        setTimeout(() => {
+          options[index].classList.remove("correct", "wrong");
+        }, 500);
+      }
+    }
+   
+    
+
+    document.addEventListener("keydown", (e) => {
+  const key = e.key;
+
+  if (key === "ArrowLeft") {
+    const btn = document.querySelector(".nav-button:nth-child(1)");
+    btn.classList.add("hover");
+    setTimeout(() => btn.classList.remove("hover"), 150);
+    prevWord();
+    return;
+  } else if (key === "ArrowRight") {
+    const btn = document.querySelector(".nav-button:nth-child(2)");
+    btn.classList.add("hover");
+    setTimeout(() => btn.classList.remove("hover"), 150);
+    nextWord();
+    return;
+  }
+
+  // 1-4 和 Enter 的模拟 hover/focus 效果
+  let i = -1;
+  if (["1", "2", "3", "4"].includes(key)) {
+    i = parseInt(key, 10) - 1;
+  } else if (key === "Enter") {
+    i = 3; // Enter 相当于选择第 4 项
+  }
+
+  if (i !== -1) {
+    const options = document.querySelectorAll("#options button.option");
+    if (options[i]) {
+      const correctAnswer = document.getElementById("word").dataset.correct;
+
+      // 添加 hover 效果
+      options[i].classList.add("hover");
+      setTimeout(() => options[i].classList.remove("hover"), 150);
+
+      highlightOption(i, options[i].textContent === correctAnswer);
+      options[i].click();
+    }
+  }
+});
+
+
+    </script>
+    
+</body>
+</html>
