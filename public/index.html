@@ -181,6 +181,13 @@ button.option:hover ,button.option.hover {
   </label>
 </div>
 
+<div id="progress-input" style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+  <label>快速标记已学单词至：</label>
+  <input type="number" id="wordNumber" min="1" placeholder="输入单词号" style="width: 100px; padding: 5px;">
+  <button class="nav-button" onclick="markCompletedWords()">添加学习进度</button>
+  <div id="progressFeedback" style="color: #dc3545; margin-left: 10px;"></div>
+</div>
+
   <script>
     let words = [];
     let index = 0;
@@ -326,6 +333,52 @@ document.getElementById("speakBtn").onclick = () => {
   speakWord(word.单词);
 
 }
+
+
+
+
+function markCompletedWords() {
+  const input = document.getElementById("wordNumber");
+  const feedback = document.getElementById("progressFeedback");
+  const maxWordNumber = words.length; // 总单词数
+  const number = parseInt(input.value.trim(), 10);
+
+  // 输入验证
+  if (!number || isNaN(number) || number < 1) {
+    feedback.textContent = "请输入有效的单词号（至少为1）";
+    return;
+  }
+
+  if (number > maxWordNumber) {
+    feedback.textContent = `单词号不能超过总单词数（${maxWordNumber}）`;
+    return;
+  }
+
+  // 更新1到number的所有单词进度
+  for (let i = 0; i < number; i++) {
+    const word = words[i];
+    if (word && word.单词) {
+      progress[word.单词] = { streak: 3 }; // 标记为已学会（streak=3）
+    }
+  }
+
+  // 保存进度并刷新显示
+  saveProgress();
+  renderProgressBar();
+  renderWord(); // 重新渲染当前单词
+
+  // 反馈成功信息
+  feedback.textContent = `已成功标记1-${number}单词为已完成`;
+  input.value = "";
+  
+  // 3秒后清除反馈信息
+  setTimeout(() => {
+    feedback.textContent = "";
+  }, 3000);
+}
+
+
+
 
 function handleAnswer(isCorrect, word) {
   const feedback = document.getElementById("feedback");
