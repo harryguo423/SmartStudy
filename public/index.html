@@ -218,7 +218,8 @@ button.option:hover ,button.option.hover {
     const PROGRESS_KEY = "wordProgress";
     const REVIEW_KEY = "reviewProgress";
     
-    
+    let wordIndexCache = null;   // Map：单词 => 词条对象
+let wordIndexReady = false;  // 是否已构建索引
     
     
     // 新增：临时词表相关变量
