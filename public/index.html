@@ -286,26 +286,95 @@ function loadSelectedVocab() {
 }
 
 // 新增：将当前单词加入临时词表（去重）
-function addCurrentWordToTemp() {
-  if (words.length === 0 || !currentVocabName) {
-    document.getElementById("tempVocabStatus").textContent = "请先选择并加载词表";
-    setTimeout(() => document.getElementById("tempVocabStatus").textContent = "", 3000);
+async function addCurrentWordToTemp() {
+  const statusEl = document.getElementById("tempVocabStatus");
+
+  // 防抖：避免连点导致重复提示/重复请求
+  const btn = document.querySelector('#vocab-creation .nav-button');
+  if (btn) {
+    btn.disabled = true;
+    setTimeout(() => (btn.disabled = false), 350);
+  }
+
+  // 基本前置检查
+  if (!currentVocabName) {
+    statusEl.textContent = "请先选择并加载词表";
+    setTimeout(() => (statusEl.textContent = ""), 2000);
     return;
   }
 
-  const currentWordData = getWordsToStudy()[index % getWordsToStudy().length];
-  // 去重：判断临时词表中是否已有该单词（按“单词”字段判断）
-  const isDuplicate = tempVocab.some(item => item.单词 === currentWordData.单词);
+  // 获取屏幕上“当前显示的单词”
+  const wordEl = document.getElementById("word");
+  // 优先用我们在 renderWord() 中写入的 data-word（避免 innerHTML 混入🔊按钮）
+  const displayedWord =
+    wordEl?.dataset?.word ||
+    (wordEl?.firstChild?.nodeType === Node.TEXT_NODE
+      ? wordEl.firstChild.nodeValue
+      : (wordEl?.textContent || "")
+    ).replace("🔊", "").trim();
 
-  if (isDuplicate) {
-    document.getElementById("tempVocabStatus").textContent = "该单词已在临时词表中";
-  } else {
-    tempVocab.push(currentWordData);
-    document.getElementById("tempVocabStatus").textContent = `✅ 已添加！临时词表共${tempVocab.length}个单词`;
+  if (!displayedWord) {
+    statusEl.textContent = "未检测到当前单词";
+    setTimeout(() => (statusEl.textContent = ""), 2000);
+    return;
   }
 
-  // 3秒后清空提示
-  setTimeout(() => document.getElementById("tempVocabStatus").textContent = "", 3000);
+  try {
+    // 1) 确保有总词表索引（word.json）
+    //    仅首击时加载并构建一次，后续直接走缓存
+    if (!wordIndexReady) {
+      let data;
+      try {
+        const res = await fetch("/word.json", { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json();
+      } catch (e) {
+        statusEl.textContent = "加载总词表失败，请检查 /word.json 路径与返回格式";
+        setTimeout(() => (statusEl.textContent = ""), 3000);
+        return;
+      }
+
+      // 兼容两种结构：直接数组 或 {words: [...]}
+      const arr = Array.isArray(data) ? data : Array.isArray(data.words) ? data.words : [];
+      if (arr.length === 0) {
+        statusEl.textContent = "总词表为空或结构不正确";
+        setTimeout(() => (statusEl.textContent = ""), 3000);
+        return;
+      }
+
+      wordIndexCache = new Map();
+      for (const item of arr) {
+        if (item && typeof item === "object" && item.单词) {
+          wordIndexCache.set(String(item.单词).trim(), item);
+        }
+      }
+      wordIndexReady = true;
+    }
+
+    // 2) 在总词表中定位当前单词
+    const entry = wordIndexCache.get(displayedWord);
+    if (!entry) {
+      statusEl.textContent = `总词表中未找到：${displayedWord}`;
+      setTimeout(() => (statusEl.textContent = ""), 2500);
+      return;
+    }
+
+    // 3) 去重后加入临时词表
+    const exists = tempVocab.some((x) => x.单词 === entry.单词);
+    if (exists) {
+      statusEl.textContent = "该单词已在临时词表中";
+      setTimeout(() => (statusEl.textContent = ""), 2000);
+      return;
+    }
+
+    tempVocab.push(entry);
+    statusEl.textContent = `✅ 已添加「${entry.单词}」！临时词表共 ${tempVocab.length} 个`;
+    setTimeout(() => (statusEl.textContent = ""), 2500);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "加入失败：出现异常";
+    setTimeout(() => (statusEl.textContent = ""), 2500);
+  }
 }
 
 // 新增：创建新词表（将临时词表保存为json文件）
