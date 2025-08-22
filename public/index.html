@@ -372,7 +372,7 @@ async function addCurrentWordToTemp() {
     setTimeout(() => (statusEl.textContent = ""), 2500);
   } catch (err) {
     console.error(err);
-    statusEl.textContent = "加入失败：出现异常";
+    statusEl.textContent = err.message || err;
     setTimeout(() => (statusEl.textContent = ""), 2500);
   }
 }
