@@ -330,7 +330,7 @@ async function addCurrentWordToTemp() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         data = await res.json();
       } catch (e) {
-        statusEl.textContent = "加载总词表失败，请检查 /word.json 路径与返回格式";
+        statusEl.textContent = e||e.message;
         setTimeout(() => (statusEl.textContent = ""), 3000);
         return;
       }
