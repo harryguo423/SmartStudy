@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+(<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
@@ -181,6 +181,29 @@ button.option:hover ,button.option.hover {
   </label>
 </div>
 
+<!-- 新增：词表选择下拉框 -->
+<div id="vocab-selection" style="margin-bottom: 1rem;">
+  <label>
+    选择词表：
+    <select id="vocabSelector" onchange="loadSelectedVocab()">
+      <option value="">-- 请选择词表 --</option>
+    </select>
+  </label>
+  <span id="vocabFeedback" style="color: #dc3545; margin-left: 10px;"></span>
+</div>
+
+<!-- 原有：状态与模式选择 -->
+<div id="status-mode" style="display: flex; justify-content: space-between; font-size: 1rem; margin-top: 1rem;">
+  <!-- 原有内容不变 -->
+</div>
+
+<!-- 新增：创建词表按钮（插入到「设置进度」按钮下方） -->
+<div id="vocab-creation" style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+  <button class="nav-button" onclick="addCurrentWordToTemp()">➕ 加入重点词</button>
+  <button class="nav-button" onclick="createNewVocab()" style="background-color: #28a745; color: white; border-color: #28a745;">📝 创建词表</button>
+  <span id="tempVocabStatus" style="color: #28a745; align-self: center;"></span>
+  </div>
+
 <div id="progress-input" style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
   <label>设置当前学习进度至单词号：</label>
   <input type="number" id="wordNumber" min="1" placeholder="输入单词号" style="width: 100px; padding: 5px;">
@@ -199,6 +222,133 @@ button.option:hover ,button.option.hover {
     
     const PROGRESS_KEY = "wordProgress";
     const REVIEW_KEY = "reviewProgress";
+    
+    
+    
+    
+    // 新增：临时词表相关变量
+let tempVocab = []; // 临时重点词表（去重）
+let currentVocabName = ""; // 当前选中的词表名
+
+// 页面加载时先获取词表列表
+window.onload = () => {
+  loadVocabList(); // 加载所有词表到下拉框
+};
+
+// 原有：fetch("/api/words") 改为根据选中词表加载，故注释原有fetch，新增以下函数
+// 新增：加载词表列表到下拉框
+function loadVocabList() {
+  fetch("/api/vocab-lists")
+    .then(res => res.json())
+    .then(lists => {
+      const selector = document.getElementById("vocabSelector");
+      selector.innerHTML = '<option value="">-- 请选择词表 --</option>'; // 清空原有选项
+      // 新增所有词表选项
+      lists.forEach(list => {
+        const option = document.createElement("option");
+        option.value = list.name;
+        option.textContent = list.label;
+        selector.appendChild(option);
+      });
+    })
+    .catch(err => {
+      document.getElementById("vocabFeedback").textContent = "加载词表列表失败";
+    });
+}
+
+// 新增：加载选中的词表
+function loadSelectedVocab() {
+  const selector = document.getElementById("vocabSelector");
+  const feedback = document.getElementById("vocabFeedback");
+  currentVocabName = selector.value;
+
+  if (!currentVocabName) {
+    feedback.textContent = "请选择词表";
+    document.getElementById("word").textContent = "请选择词表";
+    document.getElementById("options").innerHTML = "";
+    return;
+  }
+
+  // 调用后端接口获取选中词表的单词
+  fetch(`/api/words?vocabName=${encodeURIComponent(currentVocabName)}`)
+    .then(res => {
+      if (!res.ok) throw new Error("词表加载失败");
+      return res.json();
+    })
+    .then(data => {
+      words = data;
+      loadProgress();
+      loadReviewProgress();
+      initializeProgress(data);
+      index = 0;
+      currentBatchStart = 0;
+      renderWord();
+      feedback.textContent = ""; // 清空错误提示
+    })
+    .catch(err => {
+      feedback.textContent = err.message;
+    });
+}
+
+// 新增：将当前单词加入临时词表（去重）
+function addCurrentWordToTemp() {
+  if (words.length === 0 || !currentVocabName) {
+    document.getElementById("tempVocabStatus").textContent = "请先选择并加载词表";
+    setTimeout(() => document.getElementById("tempVocabStatus").textContent = "", 3000);
+    return;
+  }
+
+  const currentWordData = getWordsToStudy()[index % getWordsToStudy().length];
+  // 去重：判断临时词表中是否已有该单词（按“单词”字段判断）
+  const isDuplicate = tempVocab.some(item => item.单词 === currentWordData.单词);
+
+  if (isDuplicate) {
+    document.getElementById("tempVocabStatus").textContent = "该单词已在临时词表中";
+  } else {
+    tempVocab.push(currentWordData);
+    document.getElementById("tempVocabStatus").textContent = `✅ 已添加！临时词表共${tempVocab.length}个单词`;
+  }
+
+  // 3秒后清空提示
+  setTimeout(() => document.getElementById("tempVocabStatus").textContent = "", 3000);
+}
+
+// 新增：创建新词表（将临时词表保存为json文件）
+function createNewVocab() {
+  if (tempVocab.length === 0) {
+    document.getElementById("tempVocabStatus").textContent = "临时词表为空，无法创建";
+    setTimeout(() => document.getElementById("tempVocabStatus").textContent = "", 3000);
+    return;
+  }
+
+  // 调用后端接口创建新词表
+  fetch("/api/create-vocab", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ words: tempVocab })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById("tempVocabStatus").textContent = `🎉 词表创建成功！（${data.vocabName}）`;
+        tempVocab = []; // 清空临时词表
+        loadVocabList(); // 刷新词表列表，让新创建的词表可选中
+      } else {
+        document.getElementById("tempVocabStatus").textContent = data.error || "创建失败";
+      }
+    })
+    .catch(err => {
+      document.getElementById("tempVocabStatus").textContent = "创建词表出错";
+    });
+
+  setTimeout(() => document.getElementById("tempVocabStatus").textContent = "", 3000);
+}
+
+// 注释原有直接加载words的fetch代码（替换为按词表加载）
+// 原有代码：fetch("/api/words").then(res => res.json()).then(data => { ... });(
+    
     
     function saveProgress() {
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
@@ -225,13 +375,7 @@ button.option:hover ,button.option.hover {
       });
     }
     
-    fetch("/api/words").then(res => res.json()).then(data => {
-      words = data;
-      loadProgress();
-      loadReviewProgress();
-      initializeProgress(data);
-      renderWord();
-    });
+  ==
     
     function shuffle(arr) {
   // Fisher-Yates shuffle
