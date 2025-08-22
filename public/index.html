@@ -326,7 +326,7 @@ async function addCurrentWordToTemp() {
     if (!wordIndexReady) {
       let data;
       try {
-        const res = await fetch("/word.json", { cache: "no-store" });
+        const res = await fetch("/data/word.json", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         data = await res.json();
       } catch (e) {
