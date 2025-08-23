@@ -154,6 +154,18 @@ button.option:hover ,button.option.hover {
     .hidden { display: none; }
     .learned { color: green; font-weight: bold; }
     #progress-bar div { height: 20px; }
+    #error-words-section {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+    }
+    #error-words-display {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
@@ -164,6 +176,12 @@ button.option:hover ,button.option.hover {
   <div id="nav-buttons">
     <button class="nav-button" onclick="prevWord()">⬅️ 上一个单词</button>
     <button class="nav-button" onclick="nextWord()">下一个单词 ➡️</button>
+  </div>
+  
+  <!-- 错词本按钮 -->
+  <div id="error-words-buttons" style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 2rem;">
+    <button class="nav-button" onclick="generateErrorWords()">生成错词本</button>
+    <button class="nav-button" onclick="clearErrorWords()">清空错词本</button>
   </div>
   
   <div style="margin-top:2rem"></div>
@@ -188,6 +206,12 @@ button.option:hover ,button.option.hover {
   <div id="progressFeedback" style="color: #dc3545; margin-left: 10px;"></div>
 </div>
 
+<!-- 错词本展示区域 -->
+<div id="error-words-section">
+  <h3>错词本</h3>
+  <div id="error-words-display">暂无错词记录</div>
+</div>
+
   <script>
     let words = [];
     let index = 0;
@@ -195,10 +219,12 @@ button.option:hover ,button.option.hover {
     let currentBatchStart = 0;
     let progress = {};
     let reviewProgress = {};
+    let errorWords = new Set(); // 错词集合，避免重复
     let mode = 'learn';
     
     const PROGRESS_KEY = "wordProgress";
     const REVIEW_KEY = "reviewProgress";
+    const ERROR_WORDS_KEY = "errorWords"; // 新增错词本存储键
     
     function saveProgress() {
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
@@ -206,6 +232,11 @@ button.option:hover ,button.option.hover {
     
     function saveReviewProgress() {
       localStorage.setItem(REVIEW_KEY, JSON.stringify(reviewProgress));
+    }
+    
+    // 新增：保存错词本
+    function saveErrorWords() {
+      localStorage.setItem(ERROR_WORDS_KEY, JSON.stringify(Array.from(errorWords)));
     }
     
     function loadProgress() {
@@ -216,6 +247,12 @@ button.option:hover ,button.option.hover {
     function loadReviewProgress() {
       const raw = localStorage.getItem(REVIEW_KEY);
       if (raw) reviewProgress = JSON.parse(raw);
+    }
+    
+    // 新增：加载错词本
+    function loadErrorWords() {
+      const raw = localStorage.getItem(ERROR_WORDS_KEY);
+      if (raw) errorWords = new Set(JSON.parse(raw));
     }
     
     function initializeProgress(data) {
@@ -229,6 +266,7 @@ button.option:hover ,button.option.hover {
       words = data;
       loadProgress();
       loadReviewProgress();
+      loadErrorWords(); // 新增：加载错词本
       initializeProgress(data);
       renderWord();
     });
@@ -407,6 +445,10 @@ function handleAnswer(isCorrect, word) {
     }
     feedback.textContent = `✅ 正确！联想法：${word.单词联想背诵法}`;
   } else {
+    // 新增：回答错误时将单词加入错词本
+    errorWords.add(word.单词);
+    saveErrorWords();
+    
     if (mode === 'learn') {
       progress[word.单词].streak = 0;
       saveProgress();
@@ -426,6 +468,29 @@ function speakWord(text) {
  //  speechSynthesis.speak(utter);
 }
 
+    // 新增：生成错词本
+    function generateErrorWords() {
+      const display = document.getElementById("error-words-display");
+      if (errorWords.size === 0) {
+        display.textContent = "暂无错词记录";
+        return;
+      }
+      // 以"单词，单词，单词"格式显示
+      display.textContent = Array.from(errorWords).join("，");
+    }
+    
+    // 新增：清空错词本
+    function clearErrorWords() {
+      if (confirm("确定要清空错词本吗？")) {
+        errorWords.clear();
+        saveErrorWords();
+        document.getElementById("error-words-display").textContent = "错词本已清空";
+        // 3秒后恢复显示默认文本
+        setTimeout(() => {
+          document.getElementById("error-words-display").textContent = "暂无错词记录";
+        }, 3000);
+      }
+    }
     
     function nextWord() {
       index++;
