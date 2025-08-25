@@ -617,6 +617,21 @@ document.addEventListener("keydown", (e) => {
   const totalOptions = options.length;
   const rows = Math.ceil(totalOptions / 4); // 计算总行数（每行4列）
 
+  if (key === "ArrowLeft") {
+    const btn = document.querySelector(".nav-button:nth-child(1)");
+    btn.classList.add("hover");
+    setTimeout(() => btn.classList.remove("hover"), 150);
+    prevWord();
+    return;
+  } else if (key === "ArrowRight") {
+    const btn = document.querySelector(".nav-button:nth-child(2)");
+    btn.classList.add("hover");
+    setTimeout(() => btn.classList.remove("hover"), 150);
+    nextWord();
+    return;
+  }
+
+
   // 处理行键（q/w/e/r）- 对应1-4行
   if (["q", "w", "e", "r"].includes(key)) {
     const rowMap = { "q": 0, "w": 1, "e": 2, "r": 3 };
