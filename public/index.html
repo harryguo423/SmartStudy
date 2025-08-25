@@ -611,26 +611,27 @@ function speakWord(text) {
 let currentRow = null; // 记录当前按下的行键（q/w/e/r对应0/1/2/3）
 let currentCol = null; // 记录当前按下的列键（1-4/Enter对应0/1/2/3）
 
+
 document.addEventListener("keydown", (e) => {
   const key = e.key.toLowerCase();
   const options = document.querySelectorAll("#options button.option");
   const totalOptions = options.length;
   const rows = Math.ceil(totalOptions / 4); // 计算总行数（每行4列）
 
-  if (key === "ArrowLeft") {
+  // 保留箭头左右键导航功能
+  if (key === "arrowleft") {
     const btn = document.querySelector(".nav-button:nth-child(1)");
     btn.classList.add("hover");
     setTimeout(() => btn.classList.remove("hover"), 150);
     prevWord();
     return;
-  } else if (key === "ArrowRight") {
+  } else if (key === "arrowright") {
     const btn = document.querySelector(".nav-button:nth-child(2)");
     btn.classList.add("hover");
     setTimeout(() => btn.classList.remove("hover"), 150);
     nextWord();
     return;
   }
-
 
   // 处理行键（q/w/e/r）- 对应1-4行
   if (["q", "w", "e", "r"].includes(key)) {
@@ -669,6 +670,17 @@ document.addEventListener("keydown", (e) => {
     currentCol = null;
   }
 });
+
+// 按键释放时重置对应状态
+document.addEventListener("keyup", (e) => {
+  const key = e.key.toLowerCase();
+  if (["q", "w", "e", "r"].includes(key)) {
+    currentRow = null;
+  } else if (["1", "2", "3", "4", "enter", "arrowleft", "arrowright"].includes(key)) {
+    currentCol = null;
+  }
+});
+
 
 // 按键释放时重置对应状态
 document.addEventListener("keyup", (e) => {
