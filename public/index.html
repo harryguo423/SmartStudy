@@ -641,9 +641,6 @@ document.addEventListener("keydown", (e) => {
     if (row < rows) {
       currentRow = row;
     }
-    if(currentRow == null){
-      currentRow = 0;
-    }
   }
 
   // 处理列键（1-4/Enter）- 对应1-4列
@@ -653,7 +650,10 @@ document.addEventListener("keydown", (e) => {
   }
 
   // 当行和列都已确定时，计算选项索引并触发选择
-  if (currentRow !== null && currentCol !== null) {
+  if (currentCol !== null) {
+        if(currentRow == null){
+      currentRow = 0;
+    }
     const index = currentRow * 4 + currentCol;
     // 检查索引是否有效（不超过选项总数）
     if (index < totalOptions && options[index]) {
