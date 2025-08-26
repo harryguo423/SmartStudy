@@ -641,6 +641,9 @@ document.addEventListener("keydown", (e) => {
     if (row < rows) {
       currentRow = row;
     }
+    if(currentRow == null){
+      currentRow = 0;
+    }
   }
 
   // 处理列键（1-4/Enter）- 对应1-4列
