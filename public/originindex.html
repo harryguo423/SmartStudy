@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>单词学习</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; }
+    #options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2%;
+  justify-content: space-between;
+}
+
+button.option {
+  flex: 0 1 23%;  /* 占宽约1/4（加gap更自然） */
+  box-sizing: border-box;
+  padding: 10px;
+  word-wrap: break-word;
+  white-space: normal;
+  text-align: center;
+  border-radius: 1rem;
+  font-size:1rem;
+  margin-bottom:3rem;
+}
+
+button.option.correct {
+  border: 2px solid #28a745;
+  background-color: #e8f5e9;
+  position: relative;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+button.option.correct::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid #28a745;
+  border-radius: 1rem;
+  opacity: 0.6;
+  animation: pulseOutGreen 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+button.option.wrong {
+  border: 2px solid #dc3545;
+  background-color: #f8d7da;
+  position: relative;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+button.option.wrong::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid #dc3545;
+  border-radius: 1rem;
+  opacity: 0.6;
+  animation: pulseOutRed 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes pulseOutGreen {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+@keyframes pulseOutRed {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+
+button.option.selected::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border: 2px solid #007bff;
+  border-radius: 1rem;
+  opacity: 0.6;
+  animation: pulseOut 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes pulseOut {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+    border-radius:1rem;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;border-radius:1rem;
+  }
+}
+
+#nav-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+button.option:hover ,button.option.hover {
+  background-color:  rgba(0, 123, 255, 0.3);
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+}
+
+
+.nav-button {
+  background-color: #f0f0f0;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  padding: 0.6em 1.2em;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #007bff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#word {
+  text-align: center;
+  font-size: 3rem;
+  margin-top:2rem;
+  margin-bottom: 5rem;
+}
+
+
+.nav-button:hover,.nav-button.hover,
+.nav-button:focus  {
+  background-color: #007bff;
+  color: white;
+  transform: scale(1.05);
+}
+
+.nav-button:active {
+  transform: scale(0.97);
+}
+
+    .hidden { display: none; }
+    .learned { color: green; font-weight: bold; }
+    #progress-bar div { height: 20px; }
+    #error-words-section {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+    }
+    #error-words-display {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  
+  <h2 id="word">加载中...</h2>
+  <div id="options"></div>
+  <div id="feedback" class="hidden"></div>
+  <div id="nav-buttons">
+    <button class="nav-button" onclick="prevWord()">⬅️ 上一个单词</button>
+    <button class="nav-button" onclick="nextWord()">下一个单词 ➡️</button>
+  </div>
+  
+  <!-- 错词本按钮 -->
+  <div id="error-words-buttons" style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 2rem;">
+    <button class="nav-button" onclick="generateErrorWords()">生成错词本</button>
+    <button class="nav-button" onclick="clearErrorWords()">清空错词本</button>
+  </div>
+  
+  <div style="margin-top:2rem"></div>
+  <div id="progress-bar" style="display: flex; gap: 2px; margin-top: 30px; border-radius: 10rem; overflow: hidden;"></div>
+
+<!-- 状态与模式选择 -->
+<div id="status-mode" style="display: flex; justify-content: space-between; font-size: 1rem; margin-top: 1rem;">
+  <div id="status">已学会：0/0</div>
+  <div style="display: flex; gap: 1rem; align-items: center;">
+    <label>
+      选项数量：
+      <select id="optionCountSelector" onchange="updateOptionCount()">
+        <option value="4">4个选项（1行）</option>
+        <option value="8">8个选项（2行）</option>
+        <option value="12">12个选项（3行）</option>
+        <option value="16">16个选项（4行）</option>
+      </select>
+    </label>
+    <label>
+      模式选择：
+      <select id="modeSelector" onchange="switchMode()">
+        <option value="learn">🧠 学习模式</option>
+        <option value="review">📘 复习模式</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<div id="progress-input" style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+  <label>设置当前学习进度至单词号：</label>
+  <input type="number" id="wordNumber" min="1" placeholder="输入单词号" style="width: 100px; padding: 5px;">
+  <button class="nav-button" onclick="setLearningProgress()">设置进度</button>
+  <div id="progressFeedback" style="color: #dc3545; margin-left: 10px;"></div>
+</div>
+
+<!-- 错词本展示区域 -->
+<div id="error-words-section">
+  <h3>错词本</h3>
+  <div id="error-words-display">暂无错词记录</div>
+</div>
+
+  <script>
+    let words = [];
+    let index = 0;
+    let batchSize = 20;
+    let currentBatchStart = 0;
+    let progress = {};
+    let reviewProgress = {};
+    let errorWords = new Set(); // 错词集合，避免重复
+    let mode = 'learn';
+    let optionCount = 4; // 默认4个选项
+    
+    const PROGRESS_KEY = "wordProgress";
+    const REVIEW_KEY = "reviewProgress";
+    const ERROR_WORDS_KEY = "errorWords";
+    const OPTION_COUNT_KEY = "optionCount"; // 新增选项数量存储键
+    
+    function saveProgress() {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
+    
+    function saveReviewProgress() {
+      localStorage.setItem(REVIEW_KEY, JSON.stringify(reviewProgress));
+    }
+    
+    // 新增：保存选项数量设置
+    function saveOptionCount() {
+      localStorage.setItem(OPTION_COUNT_KEY, optionCount);
+    }
+    
+    // 新增：加载选项数量设置
+    function loadOptionCount() {
+      const saved = localStorage.getItem(OPTION_COUNT_KEY);
+      if (saved) {
+        optionCount = parseInt(saved);
+        document.getElementById("optionCountSelector").value = optionCount;
+      }
+    }
+    
+    function saveErrorWords() {
+      localStorage.setItem(ERROR_WORDS_KEY, JSON.stringify(Array.from(errorWords)));
+    }
+    
+    function loadProgress() {
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      if (raw) progress = JSON.parse(raw);
+    }
+    
+    function loadReviewProgress() {
+      const raw = localStorage.getItem(REVIEW_KEY);
+      if (raw) reviewProgress = JSON.parse(raw);
+    }
+    
+    function loadErrorWords() {
+      const raw = localStorage.getItem(ERROR_WORDS_KEY);
+      if (raw) errorWords = new Set(JSON.parse(raw));
+    }
+    
+    function initializeProgress(data) {
+      if (!progress) progress = {};
+      data.forEach(w => {
+        if (!(w.单词 in progress)) progress[w.单词] = { streak: 0 };
+      });
+    }
+    
+    fetch("/api/words").then(res => res.json()).then(data => {
+      words = data;
+      loadProgress();
+      loadReviewProgress();
+      loadErrorWords();
+      loadOptionCount(); // 新增：加载选项数量设置
+      initializeProgress(data);
+      renderWord();
+    });
+    
+    function shuffle(arr) {
+  // Fisher-Yates shuffle
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function getWordsToStudy() {
+  if (mode === 'learn') {
+    const batch = words.slice(currentBatchStart, currentBatchStart + batchSize);
+    const unlearned = batch.filter(w => progress[w.单词].streak < 3);
+    shuffle(unlearned);
+    return unlearned;
+  } else {
+    const reviewing = words.filter(w =>
+      progress[w.单词]?.streak >= 3 && (reviewProgress[w.单词]?.review ?? 0) > 0
+    );
+    shuffle(reviewing);
+    return reviewing;
+  }
+}
+
+    
+function renderWord() {
+  const list = getWordsToStudy();
+
+  const learnedCount = Object.values(progress).filter(p => p.streak >= 3).length;
+  const totalCount = words.length;
+  const reviewedCount = words.filter(w =>
+    progress[w.单词]?.streak >= 3 && (reviewProgress[w.单词]?.review ?? 0) === 0
+  ).length;
+
+  if (list.length === 0) {
+    if (mode === 'learn') {
+      if (currentBatchStart + batchSize >= totalCount) {
+        document.getElementById("status").innerHTML = `🎉 所有单词已学完！（共 ${learnedCount}/${totalCount}）`;
+        document.getElementById("word").textContent = "";
+        
+        document.getElementById("options").innerHTML = "";
+        document.getElementById("feedback").classList.add("hidden");
+        return;
+      } else {
+        currentBatchStart += batchSize;
+        index = 0;
+        renderWord();
+        return;
+      }
+    } else {
+      document.getElementById("status").innerHTML = `✅ 复习完成！（共复习 ${reviewedCount}/${totalCount}）`;
+      document.getElementById("word").textContent = "";
+      document.getElementById("options").innerHTML = "";
+      document.getElementById("feedback").classList.add("hidden");
+      return;
+    }
+  }
+
+  const word = list[index % list.length];
+  document.getElementById("word").textContent = word.单词;
+  const wordText = document.getElementById("word");
+wordText.innerHTML = `${word.单词} <button id="speakBtn" style="font-size: 0.6em;">🔊</button>`;
+
+document.getElementById("speakBtn").onclick = () => {
+  speakWord(word.单词);
+};
+
+  document.getElementById("word").dataset.correct = word.单词释义;
+  document.getElementById("feedback").classList.add("hidden");
+
+  const correct = word.单词释义;
+  let options = [correct];
+  // 根据设置的选项数量生成干扰项
+  while (options.length < optionCount) {
+    let rand = words[Math.floor(Math.random() * words.length)].单词释义;
+    if (!options.includes(rand)) options.push(rand);
+  }
+  options.sort(() => Math.random() - 0.5);
+
+  const container = document.getElementById("options");
+  container.innerHTML = "";
+  options.forEach((opt, i) => {
+    const btn = document.createElement("button");
+    btn.className = "option";
+    btn.textContent = opt;
+    btn.onclick = () => {
+      const isCorrect = opt === correct;
+      highlightOption(i, isCorrect);
+      handleAnswer(isCorrect, word);
+    };
+    container.appendChild(btn);
+  });
+
+  document.getElementById("status").textContent =
+    mode === 'learn'
+      ? `已学会：${learnedCount}/${totalCount}`
+      : `复习中：${list.length} 个单词`;
+
+  renderProgressBar();
+  speakWord(word.单词);
+
+}
+
+// 新增：更新选项数量
+function updateOptionCount() {
+  optionCount = parseInt(document.getElementById("optionCountSelector").value);
+  saveOptionCount();
+  renderWord(); // 重新渲染当前单词的选项
+}
+
+
+function setLearningProgress() {
+  const input = document.getElementById("wordNumber");
+  const feedback = document.getElementById("progressFeedback");
+  const maxWordNumber = words.length; // 总单词数
+  const targetNumber = parseInt(input.value.trim(), 10);
+
+  // 输入验证
+  if (!targetNumber || isNaN(targetNumber) || targetNumber < 1) {
+    feedback.textContent = "请输入有效的单词号（至少为1）";
+    return;
+  }
+
+  if (targetNumber > maxWordNumber) {
+    feedback.textContent = `单词号不能超过总单词数（${maxWordNumber}）`;
+    return;
+  }
+
+  // 重置所有单词的学习进度
+  for (let i = 0; i < maxWordNumber; i++) {
+    const word = words[i];
+    if (word && word.单词) {
+      // 对于目标单词号之前的单词标记为已完成
+      // 目标及之后的单词标记为未完成
+      if (i < targetNumber - 1) {
+        progress[word.单词] = { streak: 3 }; // 已完成
+      } else {
+        progress[word.单词] = { streak: 0 }; // 未完成
+      }
+    }
+  }
+
+  // 设置当前单词索引为目标单词号 - 1（因为数组从0开始）
+  currentWordIndex = targetNumber - 1;
+
+  // 保存进度并刷新显示
+  saveProgress();
+  renderProgressBar();
+  renderWord(); // 重新渲染当前单词
+
+  // 反馈成功信息
+  feedback.textContent = `已成功设置学习进度至单词号 ${targetNumber}`;
+  input.value = "";
+  
+  // 3秒后清除反馈信息
+  setTimeout(() => {
+    feedback.textContent = "";
+  }, 3000);
+}
+
+function handleAnswer(isCorrect, word) {
+  const feedback = document.getElementById("feedback");
+  const audio = new Audio(isCorrect ? "/correct.wav" : "/wrong.wav");
+  audio.play();
+
+  if (isCorrect) {
+    if (mode === 'learn') {
+      progress[word.单词].streak++;
+      if (progress[word.单词].streak > 3) progress[word.单词].streak = 3;
+      saveProgress();
+    } else {
+      if (!reviewProgress[word.单词]) reviewProgress[word.单词] = { review: 1 };
+      reviewProgress[word.单词].review--;
+      if (reviewProgress[word.单词].review < 0) reviewProgress[word.单词].review = 0;
+      saveReviewProgress();
+    }
+    feedback.textContent = `✅ 正确！联想法：${word.单词联想背诵法}`;
+  } else {
+    // 回答错误时将单词加入错词本
+    errorWords.add(word.单词);
+    saveErrorWords();
+    
+    if (mode === 'learn') {
+      progress[word.单词].streak = 0;
+      saveProgress();
+    } else {
+      reviewProgress[word.单词] = { review: 3 };
+      saveReviewProgress();
+    }
+    feedback.textContent = `❌ 错误！联想法：${word.单词联想背诵法}`;
+  }
+
+  feedback.classList.remove("hidden");
+}
+
+function speakWord(text) {
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "en-US";
+ //  speechSynthesis.speak(utter);
+}
+
+    // 生成错词本
+    function generateErrorWords() {
+      const display = document.getElementById("error-words-display");
+      if (errorWords.size === 0) {
+        display.textContent = "暂无错词记录";
+        return;
+      }
+      // 以"单词，单词，单词"格式显示
+      display.textContent = Array.from(errorWords).join("，");
+    }
+    
+    // 清空错词本
+    function clearErrorWords() {
+      if (confirm("确定要清空错词本吗？")) {
+        errorWords.clear();
+        saveErrorWords();
+        document.getElementById("error-words-display").textContent = "错词本已清空";
+        // 3秒后恢复显示默认文本
+        setTimeout(() => {
+          document.getElementById("error-words-display").textContent = "暂无错词记录";
+        }, 3000);
+      }
+    }
+    
+    function nextWord() {
+      index++;
+      renderWord();
+    }
+    
+    function prevWord() {
+      const list = getWordsToStudy();
+      index = (index - 1 + list.length) % list.length;
+      renderWord();
+    }
+    
+    function switchMode() {
+      mode = document.getElementById("modeSelector").value;
+      index = 0;
+      currentBatchStart = 0;
+    
+      if (mode === 'review') {
+        words.forEach(w => {
+          if (progress[w.单词]?.streak >= 3 && !(w.单词 in reviewProgress)) {
+            reviewProgress[w.单词] = { review: 1 };
+          }
+        });
+        saveReviewProgress();
+      }
+    
+      renderWord();
+    }
+    
+
+
+
+
+
+    function renderProgressBar() {
+      const bar = document.getElementById("progress-bar");
+      bar.innerHTML = "";
+    
+      let total = words.length;
+      let learned = 0;
+      let learning = 0;
+    
+      if (mode === 'learn') {
+        words.forEach(w => {
+          let s = progress[w.单词]?.streak ?? 0;
+          if (s >= 3) learned++;
+          else if (s > 0) learning++;
+        });
+      } else {
+        words.forEach(w => {
+          if (progress[w.单词]?.streak >= 3) {
+            let r = reviewProgress[w.单词]?.review ?? 0;
+            if (r === 0) learned++;
+            else learning++;
+          }
+        });
+      }
+    
+      let learnedPct = (learned / total) * 100;
+      let learningPct = (learning / total) * 100;
+      let unlearnedPct = 100 - learnedPct - learningPct;
+    
+      const addSegment = (color, width) => {
+        const div = document.createElement("div");
+        div.style.width = `${width}%`;
+        div.style.height = "20px";
+        div.style.backgroundColor = color;
+        bar.appendChild(div);
+      };
+    
+      addSegment("#007bff", learnedPct);   // 蓝色：已学会
+      addSegment("#ffc107", learningPct);  // 黄色：正在学
+      addSegment("#ccc", unlearnedPct);    // 灰色：未学
+    }
+    
+    function highlightOption(index, isCorrect) {
+      const options = document.querySelectorAll("#options button.option");
+      options.forEach(btn => btn.classList.remove("correct", "wrong"));
+    
+      if (options[index]) {
+        options[index].classList.add(isCorrect ? "correct" : "wrong");
+        setTimeout(() => {
+          options[index].classList.remove("correct", "wrong");
+        }, 500);
+      }
+    }
+   
+// 修改键盘事件监听逻辑，实现行+列组合选择
+let currentRow = null; // 记录当前按下的行键（q/w/e/r对应0/1/2/3）
+let currentCol = null; // 记录当前按下的列键（1-4/Enter对应0/1/2/3）
+
+
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase();
+  const options = document.querySelectorAll("#options button.option");
+  const totalOptions = options.length;
+  const rows = Math.ceil(totalOptions / 4); // 计算总行数（每行4列）
+
+  // 保留箭头左右键导航功能
+  if (key === "arrowleft") {
+    const btn = document.querySelector(".nav-button:nth-child(1)");
+    btn.classList.add("hover");
+    setTimeout(() => btn.classList.remove("hover"), 150);
+    prevWord();
+    return;
+  } else if (key === "arrowright") {
+    const btn = document.querySelector(".nav-button:nth-child(2)");
+    btn.classList.add("hover");
+    setTimeout(() => btn.classList.remove("hover"), 150);
+    nextWord();
+    return;
+  }
+
+  // 处理行键（q/w/e/r）- 对应1-4行
+  if (["q", "w", "e", "r"].includes(key)) {
+    const rowMap = { "q": 0, "w": 1, "e": 2, "r": 3 };
+    const row = rowMap[key];
+    // 只记录有效行（不超过当前总行列数）
+    if (row < rows) {
+      currentRow = row;
+    }
+  }
+
+  // 处理列键（1-4/Enter）- 对应1-4列
+  else if (["1", "2", "3", "4"].includes(key) || key === "enter") {
+    const colMap = { "1": 0, "2": 1, "3": 2, "4": 3, "enter": 3 };
+    currentCol = colMap[key];
+  }
+
+  // 当行和列都已确定时，计算选项索引并触发选择
+  if (currentCol !== null) {
+        if(currentRow == null){
+      currentRow = 0;
+    }
+    const index = currentRow * 4 + currentCol;
+    // 检查索引是否有效（不超过选项总数）
+    if (index < totalOptions && options[index]) {
+      const correctAnswer = document.getElementById("word").dataset.correct;
+      
+      // 添加视觉反馈
+      options[index].classList.add("hover");
+      setTimeout(() => options[index].classList.remove("hover"), 150);
+      
+      // 触发选择逻辑
+      highlightOption(index, options[index].textContent === correctAnswer);
+      options[index].click();
+    }
+    
+    // 重置选择状态，避免重复触发
+    currentRow = null;
+    currentCol = null;
+  }
+});
+
+// 按键释放时重置对应状态
+document.addEventListener("keyup", (e) => {
+  const key = e.key.toLowerCase();
+  if (["q", "w", "e", "r"].includes(key)) {
+    currentRow = null;
+  } else if (["1", "2", "3", "4", "enter", "arrowleft", "arrowright"].includes(key)) {
+    currentCol = null;
+  }
+});
+
+
+// 按键释放时重置对应状态
+document.addEventListener("keyup", (e) => {
+  const key = e.key.toLowerCase();
+  if (["q", "w", "e", "r"].includes(key)) {
+    currentRow = null;
+  } else if (["1", "2", "3", "4", "enter"].includes(key)) {
+    currentCol = null;
+  }
+});
+
+
+
+    </script>
+    
+</body>
+</html>

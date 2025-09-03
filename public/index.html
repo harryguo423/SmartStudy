@@ -1,703 +1,1423 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <title>单词学习</title>
-  <style>
-    body { font-family: sans-serif; padding: 2em; }
-    #options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2%;
-  justify-content: space-between;
-}
-
-button.option {
-  flex: 0 1 23%;  /* 占宽约1/4（加gap更自然） */
-  box-sizing: border-box;
-  padding: 10px;
-  word-wrap: break-word;
-  white-space: normal;
-  text-align: center;
-  border-radius: 1rem;
-  font-size:1rem;
-  margin-bottom:3rem;
-}
-
-button.option.correct {
-  border: 2px solid #28a745;
-  background-color: #e8f5e9;
-  position: relative;
-  border-radius: 1rem;
-  transition: all 0.2s ease;
-}
-
-button.option.correct::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
-  border: 2px solid #28a745;
-  border-radius: 1rem;
-  opacity: 0.6;
-  animation: pulseOutGreen 0.5s ease-out forwards;
-  pointer-events: none;
-}
-
-button.option.wrong {
-  border: 2px solid #dc3545;
-  background-color: #f8d7da;
-  position: relative;
-  border-radius: 1rem;
-  transition: all 0.2s ease;
-}
-
-button.option.wrong::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
-  border: 2px solid #dc3545;
-  border-radius: 1rem;
-  opacity: 0.6;
-  animation: pulseOutRed 0.5s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes pulseOutGreen {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.2); opacity: 0; }
-}
-
-@keyframes pulseOutRed {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.2); opacity: 0; }
-}
-
-
-button.option.selected::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
-  border: 2px solid #007bff;
-  border-radius: 1rem;
-  opacity: 0.6;
-  animation: pulseOut 0.5s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes pulseOut {
-  0% {
-    transform: scale(1);
-    opacity: 0.6;
-    border-radius:1rem;
-  }
-  100% {
-    transform: scale(1.2);
-    opacity: 0;border-radius:1rem;
-  }
-}
-
-#nav-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  margin-top: 2rem;
-}
-
-button.option:hover ,button.option.hover {
-  background-color:  rgba(0, 123, 255, 0.3);
-  transform: scale(1.05);
-  transition: all 0.2s ease;
-  box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
-}
-
-
-.nav-button {
-  background-color: #f0f0f0;
-  border: 2px solid #007bff;
-  border-radius: 8px;
-  padding: 0.6em 1.2em;
-  font-size: 1rem;
-  font-weight: bold;
-  color: #007bff;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-#word {
-  text-align: center;
-  font-size: 3rem;
-  margin-top:2rem;
-  margin-bottom: 5rem;
-}
-
-
-.nav-button:hover,.nav-button.hover,
-.nav-button:focus  {
-  background-color: #007bff;
-  color: white;
-  transform: scale(1.05);
-}
-
-.nav-button:active {
-  transform: scale(0.97);
-}
-
-    .hidden { display: none; }
-    .learned { color: green; font-weight: bold; }
-    #progress-bar div { height: 20px; }
-    #error-words-section {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid #eee;
-    }
-    #error-words-display {
-      margin-top: 1rem;
-      padding: 1rem;
-      background-color: #f8f9fa;
-      border-radius: 8px;
-      word-break: break-all;
-    }
-  </style>
-</head>
-<body>
-  
-  <h2 id="word">加载中...</h2>
-  <div id="options"></div>
-  <div id="feedback" class="hidden"></div>
-  <div id="nav-buttons">
-    <button class="nav-button" onclick="prevWord()">⬅️ 上一个单词</button>
-    <button class="nav-button" onclick="nextWord()">下一个单词 ➡️</button>
-  </div>
-  
-  <!-- 错词本按钮 -->
-  <div id="error-words-buttons" style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 2rem;">
-    <button class="nav-button" onclick="generateErrorWords()">生成错词本</button>
-    <button class="nav-button" onclick="clearErrorWords()">清空错词本</button>
-  </div>
-  
-  <div style="margin-top:2rem"></div>
-  <div id="progress-bar" style="display: flex; gap: 2px; margin-top: 30px; border-radius: 10rem; overflow: hidden;"></div>
-
-<!-- 状态与模式选择 -->
-<div id="status-mode" style="display: flex; justify-content: space-between; font-size: 1rem; margin-top: 1rem;">
-  <div id="status">已学会：0/0</div>
-  <div style="display: flex; gap: 1rem; align-items: center;">
-    <label>
-      选项数量：
-      <select id="optionCountSelector" onchange="updateOptionCount()">
-        <option value="4">4个选项（1行）</option>
-        <option value="8">8个选项（2行）</option>
-        <option value="12">12个选项（3行）</option>
-        <option value="16">16个选项（4行）</option>
-      </select>
-    </label>
-    <label>
-      模式选择：
-      <select id="modeSelector" onchange="switchMode()">
-        <option value="learn">🧠 学习模式</option>
-        <option value="review">📘 复习模式</option>
-      </select>
-    </label>
-  </div>
-</div>
-
-<div id="progress-input" style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
-  <label>设置当前学习进度至单词号：</label>
-  <input type="number" id="wordNumber" min="1" placeholder="输入单词号" style="width: 100px; padding: 5px;">
-  <button class="nav-button" onclick="setLearningProgress()">设置进度</button>
-  <div id="progressFeedback" style="color: #dc3545; margin-left: 10px;"></div>
-</div>
-
-<!-- 错词本展示区域 -->
-<div id="error-words-section">
-  <h3>错词本</h3>
-  <div id="error-words-display">暂无错词记录</div>
-</div>
-
-  <script>
-    let words = [];
-    let index = 0;
-    let batchSize = 20;
-    let currentBatchStart = 0;
-    let progress = {};
-    let reviewProgress = {};
-    let errorWords = new Set(); // 错词集合，避免重复
-    let mode = 'learn';
-    let optionCount = 4; // 默认4个选项
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>房屋检查登记系统 | Property Inspection System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    const PROGRESS_KEY = "wordProgress";
-    const REVIEW_KEY = "reviewProgress";
-    const ERROR_WORDS_KEY = "errorWords";
-    const OPTION_COUNT_KEY = "optionCount"; // 新增选项数量存储键
-    
-    function saveProgress() {
-      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
-    }
-    
-    function saveReviewProgress() {
-      localStorage.setItem(REVIEW_KEY, JSON.stringify(reviewProgress));
-    }
-    
-    // 新增：保存选项数量设置
-    function saveOptionCount() {
-      localStorage.setItem(OPTION_COUNT_KEY, optionCount);
-    }
-    
-    // 新增：加载选项数量设置
-    function loadOptionCount() {
-      const saved = localStorage.getItem(OPTION_COUNT_KEY);
-      if (saved) {
-        optionCount = parseInt(saved);
-        document.getElementById("optionCountSelector").value = optionCount;
-      }
-    }
-    
-    function saveErrorWords() {
-      localStorage.setItem(ERROR_WORDS_KEY, JSON.stringify(Array.from(errorWords)));
-    }
-    
-    function loadProgress() {
-      const raw = localStorage.getItem(PROGRESS_KEY);
-      if (raw) progress = JSON.parse(raw);
-    }
-    
-    function loadReviewProgress() {
-      const raw = localStorage.getItem(REVIEW_KEY);
-      if (raw) reviewProgress = JSON.parse(raw);
-    }
-    
-    function loadErrorWords() {
-      const raw = localStorage.getItem(ERROR_WORDS_KEY);
-      if (raw) errorWords = new Set(JSON.parse(raw));
-    }
-    
-    function initializeProgress(data) {
-      if (!progress) progress = {};
-      data.forEach(w => {
-        if (!(w.单词 in progress)) progress[w.单词] = { streak: 0 };
-      });
-    }
-    
-    fetch("/api/words").then(res => res.json()).then(data => {
-      words = data;
-      loadProgress();
-      loadReviewProgress();
-      loadErrorWords();
-      loadOptionCount(); // 新增：加载选项数量设置
-      initializeProgress(data);
-      renderWord();
-    });
-    
-    function shuffle(arr) {
-  // Fisher-Yates shuffle
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-}
-
-function getWordsToStudy() {
-  if (mode === 'learn') {
-    const batch = words.slice(currentBatchStart, currentBatchStart + batchSize);
-    const unlearned = batch.filter(w => progress[w.单词].streak < 3);
-    shuffle(unlearned);
-    return unlearned;
-  } else {
-    const reviewing = words.filter(w =>
-      progress[w.单词]?.streak >= 3 && (reviewProgress[w.单词]?.review ?? 0) > 0
-    );
-    shuffle(reviewing);
-    return reviewing;
-  }
-}
-
-    
-function renderWord() {
-  const list = getWordsToStudy();
-
-  const learnedCount = Object.values(progress).filter(p => p.streak >= 3).length;
-  const totalCount = words.length;
-  const reviewedCount = words.filter(w =>
-    progress[w.单词]?.streak >= 3 && (reviewProgress[w.单词]?.review ?? 0) === 0
-  ).length;
-
-  if (list.length === 0) {
-    if (mode === 'learn') {
-      if (currentBatchStart + batchSize >= totalCount) {
-        document.getElementById("status").innerHTML = `🎉 所有单词已学完！（共 ${learnedCount}/${totalCount}）`;
-        document.getElementById("word").textContent = "";
-        
-        document.getElementById("options").innerHTML = "";
-        document.getElementById("feedback").classList.add("hidden");
-        return;
-      } else {
-        currentBatchStart += batchSize;
-        index = 0;
-        renderWord();
-        return;
-      }
-    } else {
-      document.getElementById("status").innerHTML = `✅ 复习完成！（共复习 ${reviewedCount}/${totalCount}）`;
-      document.getElementById("word").textContent = "";
-      document.getElementById("options").innerHTML = "";
-      document.getElementById("feedback").classList.add("hidden");
-      return;
-    }
-  }
-
-  const word = list[index % list.length];
-  document.getElementById("word").textContent = word.单词;
-  const wordText = document.getElementById("word");
-wordText.innerHTML = `${word.单词} <button id="speakBtn" style="font-size: 0.6em;">🔊</button>`;
-
-document.getElementById("speakBtn").onclick = () => {
-  speakWord(word.单词);
-};
-
-  document.getElementById("word").dataset.correct = word.单词释义;
-  document.getElementById("feedback").classList.add("hidden");
-
-  const correct = word.单词释义;
-  let options = [correct];
-  // 根据设置的选项数量生成干扰项
-  while (options.length < optionCount) {
-    let rand = words[Math.floor(Math.random() * words.length)].单词释义;
-    if (!options.includes(rand)) options.push(rand);
-  }
-  options.sort(() => Math.random() - 0.5);
-
-  const container = document.getElementById("options");
-  container.innerHTML = "";
-  options.forEach((opt, i) => {
-    const btn = document.createElement("button");
-    btn.className = "option";
-    btn.textContent = opt;
-    btn.onclick = () => {
-      const isCorrect = opt === correct;
-      highlightOption(i, isCorrect);
-      handleAnswer(isCorrect, word);
-    };
-    container.appendChild(btn);
-  });
-
-  document.getElementById("status").textContent =
-    mode === 'learn'
-      ? `已学会：${learnedCount}/${totalCount}`
-      : `复习中：${list.length} 个单词`;
-
-  renderProgressBar();
-  speakWord(word.单词);
-
-}
-
-// 新增：更新选项数量
-function updateOptionCount() {
-  optionCount = parseInt(document.getElementById("optionCountSelector").value);
-  saveOptionCount();
-  renderWord(); // 重新渲染当前单词的选项
-}
-
-
-function setLearningProgress() {
-  const input = document.getElementById("wordNumber");
-  const feedback = document.getElementById("progressFeedback");
-  const maxWordNumber = words.length; // 总单词数
-  const targetNumber = parseInt(input.value.trim(), 10);
-
-  // 输入验证
-  if (!targetNumber || isNaN(targetNumber) || targetNumber < 1) {
-    feedback.textContent = "请输入有效的单词号（至少为1）";
-    return;
-  }
-
-  if (targetNumber > maxWordNumber) {
-    feedback.textContent = `单词号不能超过总单词数（${maxWordNumber}）`;
-    return;
-  }
-
-  // 重置所有单词的学习进度
-  for (let i = 0; i < maxWordNumber; i++) {
-    const word = words[i];
-    if (word && word.单词) {
-      // 对于目标单词号之前的单词标记为已完成
-      // 目标及之后的单词标记为未完成
-      if (i < targetNumber - 1) {
-        progress[word.单词] = { streak: 3 }; // 已完成
-      } else {
-        progress[word.单词] = { streak: 0 }; // 未完成
-      }
-    }
-  }
-
-  // 设置当前单词索引为目标单词号 - 1（因为数组从0开始）
-  currentWordIndex = targetNumber - 1;
-
-  // 保存进度并刷新显示
-  saveProgress();
-  renderProgressBar();
-  renderWord(); // 重新渲染当前单词
-
-  // 反馈成功信息
-  feedback.textContent = `已成功设置学习进度至单词号 ${targetNumber}`;
-  input.value = "";
-  
-  // 3秒后清除反馈信息
-  setTimeout(() => {
-    feedback.textContent = "";
-  }, 3000);
-}
-
-function handleAnswer(isCorrect, word) {
-  const feedback = document.getElementById("feedback");
-  const audio = new Audio(isCorrect ? "/correct.wav" : "/wrong.wav");
-  audio.play();
-
-  if (isCorrect) {
-    if (mode === 'learn') {
-      progress[word.单词].streak++;
-      if (progress[word.单词].streak > 3) progress[word.单词].streak = 3;
-      saveProgress();
-    } else {
-      if (!reviewProgress[word.单词]) reviewProgress[word.单词] = { review: 1 };
-      reviewProgress[word.单词].review--;
-      if (reviewProgress[word.单词].review < 0) reviewProgress[word.单词].review = 0;
-      saveReviewProgress();
-    }
-    feedback.textContent = `✅ 正确！联想法：${word.单词联想背诵法}`;
-  } else {
-    // 回答错误时将单词加入错词本
-    errorWords.add(word.单词);
-    saveErrorWords();
-    
-    if (mode === 'learn') {
-      progress[word.单词].streak = 0;
-      saveProgress();
-    } else {
-      reviewProgress[word.单词] = { review: 3 };
-      saveReviewProgress();
-    }
-    feedback.textContent = `❌ 错误！联想法：${word.单词联想背诵法}`;
-  }
-
-  feedback.classList.remove("hidden");
-}
-
-function speakWord(text) {
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = "en-US";
- //  speechSynthesis.speak(utter);
-}
-
-    // 生成错词本
-    function generateErrorWords() {
-      const display = document.getElementById("error-words-display");
-      if (errorWords.size === 0) {
-        display.textContent = "暂无错词记录";
-        return;
-      }
-      // 以"单词，单词，单词"格式显示
-      display.textContent = Array.from(errorWords).join("，");
-    }
-    
-    // 清空错词本
-    function clearErrorWords() {
-      if (confirm("确定要清空错词本吗？")) {
-        errorWords.clear();
-        saveErrorWords();
-        document.getElementById("error-words-display").textContent = "错词本已清空";
-        // 3秒后恢复显示默认文本
-        setTimeout(() => {
-          document.getElementById("error-words-display").textContent = "暂无错词记录";
-        }, 3000);
-      }
-    }
-    
-    function nextWord() {
-      index++;
-      renderWord();
-    }
-    
-    function prevWord() {
-      const list = getWordsToStudy();
-      index = (index - 1 + list.length) % list.length;
-      renderWord();
-    }
-    
-    function switchMode() {
-      mode = document.getElementById("modeSelector").value;
-      index = 0;
-      currentBatchStart = 0;
-    
-      if (mode === 'review') {
-        words.forEach(w => {
-          if (progress[w.单词]?.streak >= 3 && !(w.单词 in reviewProgress)) {
-            reviewProgress[w.单词] = { review: 1 };
-          }
-        });
-        saveReviewProgress();
-      }
-    
-      renderWord();
-    }
-    
-
-
-
-
-
-    function renderProgressBar() {
-      const bar = document.getElementById("progress-bar");
-      bar.innerHTML = "";
-    
-      let total = words.length;
-      let learned = 0;
-      let learning = 0;
-    
-      if (mode === 'learn') {
-        words.forEach(w => {
-          let s = progress[w.单词]?.streak ?? 0;
-          if (s >= 3) learned++;
-          else if (s > 0) learning++;
-        });
-      } else {
-        words.forEach(w => {
-          if (progress[w.单词]?.streak >= 3) {
-            let r = reviewProgress[w.单词]?.review ?? 0;
-            if (r === 0) learned++;
-            else learning++;
-          }
-        });
-      }
-    
-      let learnedPct = (learned / total) * 100;
-      let learningPct = (learning / total) * 100;
-      let unlearnedPct = 100 - learnedPct - learningPct;
-    
-      const addSegment = (color, width) => {
-        const div = document.createElement("div");
-        div.style.width = `${width}%`;
-        div.style.height = "20px";
-        div.style.backgroundColor = color;
-        bar.appendChild(div);
-      };
-    
-      addSegment("#007bff", learnedPct);   // 蓝色：已学会
-      addSegment("#ffc107", learningPct);  // 黄色：正在学
-      addSegment("#ccc", unlearnedPct);    // 灰色：未学
-    }
-    
-    function highlightOption(index, isCorrect) {
-      const options = document.querySelectorAll("#options button.option");
-      options.forEach(btn => btn.classList.remove("correct", "wrong"));
-    
-      if (options[index]) {
-        options[index].classList.add(isCorrect ? "correct" : "wrong");
-        setTimeout(() => {
-          options[index].classList.remove("correct", "wrong");
-        }, 500);
-      }
-    }
-   
-// 修改键盘事件监听逻辑，实现行+列组合选择
-let currentRow = null; // 记录当前按下的行键（q/w/e/r对应0/1/2/3）
-let currentCol = null; // 记录当前按下的列键（1-4/Enter对应0/1/2/3）
-
-
-document.addEventListener("keydown", (e) => {
-  const key = e.key.toLowerCase();
-  const options = document.querySelectorAll("#options button.option");
-  const totalOptions = options.length;
-  const rows = Math.ceil(totalOptions / 4); // 计算总行数（每行4列）
-
-  // 保留箭头左右键导航功能
-  if (key === "arrowleft") {
-    const btn = document.querySelector(".nav-button:nth-child(1)");
-    btn.classList.add("hover");
-    setTimeout(() => btn.classList.remove("hover"), 150);
-    prevWord();
-    return;
-  } else if (key === "arrowright") {
-    const btn = document.querySelector(".nav-button:nth-child(2)");
-    btn.classList.add("hover");
-    setTimeout(() => btn.classList.remove("hover"), 150);
-    nextWord();
-    return;
-  }
-
-  // 处理行键（q/w/e/r）- 对应1-4行
-  if (["q", "w", "e", "r"].includes(key)) {
-    const rowMap = { "q": 0, "w": 1, "e": 2, "r": 3 };
-    const row = rowMap[key];
-    // 只记录有效行（不超过当前总行列数）
-    if (row < rows) {
-      currentRow = row;
-    }
-  }
-
-  // 处理列键（1-4/Enter）- 对应1-4列
-  else if (["1", "2", "3", "4"].includes(key) || key === "enter") {
-    const colMap = { "1": 0, "2": 1, "3": 2, "4": 3, "enter": 3 };
-    currentCol = colMap[key];
-  }
-
-  // 当行和列都已确定时，计算选项索引并触发选择
-  if (currentCol !== null) {
-        if(currentRow == null){
-      currentRow = 0;
-    }
-    const index = currentRow * 4 + currentCol;
-    // 检查索引是否有效（不超过选项总数）
-    if (index < totalOptions && options[index]) {
-      const correctAnswer = document.getElementById("word").dataset.correct;
-      
-      // 添加视觉反馈
-      options[index].classList.add("hover");
-      setTimeout(() => options[index].classList.remove("hover"), 150);
-      
-      // 触发选择逻辑
-      highlightOption(index, options[index].textContent === correctAnswer);
-      options[index].click();
-    }
-    
-    // 重置选择状态，避免重复触发
-    currentRow = null;
-    currentCol = null;
-  }
-});
-
-// 按键释放时重置对应状态
-document.addEventListener("keyup", (e) => {
-  const key = e.key.toLowerCase();
-  if (["q", "w", "e", "r"].includes(key)) {
-    currentRow = null;
-  } else if (["1", "2", "3", "4", "enter", "arrowleft", "arrowright"].includes(key)) {
-    currentCol = null;
-  }
-});
-
-
-// 按键释放时重置对应状态
-document.addEventListener("keyup", (e) => {
-  const key = e.key.toLowerCase();
-  if (["q", "w", "e", "r"].includes(key)) {
-    currentRow = null;
-  } else if (["1", "2", "3", "4", "enter"].includes(key)) {
-    currentCol = null;
-  }
-});
-
-
-
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        dark: '#1F2937',
+                        light: '#F3F4F6'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
     </script>
     
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .form-shadow {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .card-hover {
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+            .pdf-card {
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                overflow: hidden;
+                page-break-inside: avoid;
+            }
+            .pdf-header {
+                border-bottom: 2px solid #3B82F6;
+            }
+            .pdf-footer {
+                border-top: 1px solid #e2e8f0;
+                font-size: 10px;
+                color: #64748b;
+            }
+            .camera-shutter {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                border: 4px solid white;
+                box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
+                margin: 0 auto;
+                transition: all 0.2s ease;
+            }
+            .camera-shutter:active {
+                transform: scale(0.9);
+                background-color: rgba(255,255,255,0.2);
+            }
+            .section-item {
+                transition: all 0.3s ease;
+            }
+            .section-item:hover {
+                background-color: #f9fafb;
+            }
+            .modal-backdrop {
+                backdrop-filter: blur(3px);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- 标题部分 -->
+        <header class="text-center mb-10">
+            <h1 class="text-[clamp(1.8rem,5vw,2.8rem)] font-bold text-dark mb-2">房屋检查登记系统</h1>
+            <p class="text-gray-600 text-lg mb-1">Property Inspection System</p>
+            <div class="w-32 h-1 bg-primary mx-auto mt-4 rounded-full"></div>
+        </header>
+        
+        <!-- 基本信息 -->
+        <div class="bg-white rounded-xl p-6 form-shadow mb-8">
+            <h2 class="text-xl font-semibold text-dark mb-6 flex items-center">
+                <i class="fa fa-home text-primary mr-2"></i>基本信息 | Basic Information
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="space-y-2">
+                    <label for="propertyAddress" class="block text-sm font-medium text-gray-700">
+                        房屋地址 | Property Address
+                    </label>
+                    <input type="text" id="propertyAddress" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                           placeholder="例如：北京市朝阳区XX街道XX号">
+                </div>
+                <div class="space-y-2">
+                    <label for="inspectionDate" class="block text-sm font-medium text-gray-700">
+                        检查日期 | Inspection Date
+                    </label>
+                    <input type="date" id="inspectionDate" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300">
+                </div>
+                <div class="space-y-2">
+                    <label for="inspectorName" class="block text-sm font-medium text-gray-700">
+                        检查人 | Inspector
+                    </label>
+                    <input type="text" id="inspectorName" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                           placeholder="检查人员姓名 | Inspector's Name">
+                </div>
+                <div class="space-y-2">
+                    <label for="propertyType" class="block text-sm font-medium text-gray-700">
+                        房屋类型 | Property Type
+                    </label>
+                    <select id="propertyType" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300">
+                        <option value="">请选择房屋类型 | Select Type</option>
+                        <option value="apartment">公寓 | Apartment</option>
+                        <option value="house">独栋住宅 | House</option>
+                        <option value="villa">别墅 | Villa</option>
+                        <option value="office">办公室 | Office</option>
+                        <option value="other">其他 | Other</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 房间布局导入 -->
+        <div class="bg-white rounded-xl p-6 form-shadow mb-8">
+            <h2 class="text-xl font-semibold text-dark mb-4 flex items-center">
+                <i class="fa fa-upload text-primary mr-2"></i>导入房间布局 | Import Room Layout
+            </h2>
+            <p class="text-gray-500 text-sm mb-4">格式示例 | Format Example: Kitchen[Walls/Ceiling/Oven]Dining Room[Walls/Ceiling]</p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="roomLayoutInput" 
+                       class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                       placeholder="输入房间布局 | Enter room layout">
+                <button type="button" id="importLayoutBtn" 
+                        class="bg-primary hover:bg-blue-600 text-white py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center whitespace-nowrap">
+                    <i class="fa fa-download mr-2"></i> 导入布局 | Import Layout
+                </button>
+            </div>
+        </div>
+        
+        <!-- 表单容器 -->
+        <div id="formContainer" class="space-y-8">
+            <!-- 初始房间表单 -->
+            <div class="room-form bg-white rounded-xl p-6 form-shadow card-hover">
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-semibold text-dark flex items-center">
+                            <i class="fa fa-building-o text-primary mr-2"></i>房间信息 | Room Information
+                        </h2>
+                        <p class="text-gray-500 text-sm">添加房间及其包含的部分 | Add room and its sections</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" class="add-section-btn bg-secondary hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-all duration-300 flex items-center">
+                            <i class="fa fa-plus mr-2"></i> 添加部分 | Add Section
+                        </button>
+                        <button type="button" class="remove-room-btn text-danger hover:text-red-700 transition-colors duration-300 hidden" 
+                                onclick="removeRoom(this)">
+                            <i class="fa fa-trash-o text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="roomName-0" class="block text-sm font-medium text-gray-700 mb-2">
+                        房间名称 | Room Name
+                    </label>
+                    <input type="text" id="roomName-0" class="room-name" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                           placeholder="例如：厨房 | Example: Kitchen">
+                </div>
+                
+                <!-- 部分列表 -->
+                <div class="sections-container space-y-6">
+                    <!-- 初始部分 -->
+                    <div class="section-item p-4 border border-gray-200 rounded-lg">
+                        <div class="flex justify-between items-start mb-4">
+                            <label class="block text-sm font-medium text-gray-700">
+                                部分名称 | Section Name
+                            </label>
+                            <button type="button" class="remove-section-btn text-danger hover:text-red-700 transition-colors duration-300 hidden" 
+                                    onclick="removeSection(this)">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <input type="text" class="section-name" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                                       placeholder="例如：墙壁 | Example: Walls">
+                            </div>
+                            
+                            <!-- 问题类型选择 -->
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    问题类型 | Issue Type
+                                </label>
+                                <select class="issue-type" 
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300">
+                                    <option value="">无问题 | No Issue</option>
+                                    <option value="Needs Cleaning">需要清洁 (Needs Cleaning)</option>
+                                    <option value="Needs Painting">需要粉刷 (Needs Painting)</option>
+                                    <option value="Needs Repair">需要维修 (Needs Repair)</option>
+                                    <option value="Scratched">有刮痕 (Scratched)</option>
+                                    <option value="Needs Spot Cleaning">需要污点清洗 (Needs Spot Cleaning)</option>
+                                    <option value="Needs Spot Painting">需要污点粉刷 (Needs Spot Painting)</option>
+                                    <option value="Needs Replacing">需要更换 (Needs Replacing)</option>
+                                    <option value="Heavily Used">存在影响物品寿命的明显磨损 (Heavily Used)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 备注信息 -->
+                            <div class="space-y-2 md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    备注信息 | Notes
+                                </label>
+                                <textarea class="notes" rows="2" 
+                                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                                          placeholder="请输入详细描述... | Enter detailed description..."></textarea>
+                            </div>
+                            
+                            <!-- 图片上传/拍摄 -->
+                            <div class="space-y-2 md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    现场照片 | Photos
+                                </label>
+                                <div class="flex flex-wrap gap-4">
+                                    <div class="flex-1 min-w-[200px]">
+                                        <button type="button" onclick="openCamera(this)" 
+                                                class="w-full bg-primary hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center">
+                                            <i class="fa fa-camera mr-2"></i> 拍摄照片 | Take Photo
+                                        </button>
+                                        <!-- 安卓备用方案 -->
+                                        <input type="file" accept="image/*" capture="environment" class="hidden android-camera-fallback">
+                                    </div>
+                                    <div class="flex-1 min-w-[200px]">
+                                        <label class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center cursor-pointer">
+                                            <i class="fa fa-upload mr-2"></i> 上传图片 | Upload Image
+                                            <input type="file" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 图片预览区域 -->
+                                <div class="image-preview mt-3 flex flex-wrap gap-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 按钮区域 -->
+        <div class="flex flex-col sm:flex-row gap-4 mt-10 justify-center">
+            <button type="button" id="addRoomBtn" 
+                    class="bg-secondary hover:bg-green-600 text-white py-3 px-8 rounded-lg transition-all duration-300 flex items-center justify-center whitespace-nowrap">
+                <i class="fa fa-plus-circle mr-2"></i> 添加另一个房间 | Add Another Room
+            </button>
+            
+            <button type="button" id="generatePdfBtn" 
+                    class="bg-amber-500 hover:bg-amber-600 text-white py-3 px-8 rounded-lg transition-all duration-300 flex items-center justify-center whitespace-nowrap">
+                <i class="fa fa-file-pdf-o mr-2"></i> 生成PDF报告 | Generate PDF Report
+            </button>
+        </div>
+        
+        <!-- 状态提示 -->
+        <div id="statusMessage" class="mt-6 text-center hidden"></div>
+        
+        <!-- PDF预览区域 (生成PDF时显示) -->
+        <div id="pdfPreview" class="mt-10 hidden">
+            <h2 class="text-xl font-semibold text-dark mb-4 flex items-center">
+                <i class="fa fa-file-text-o text-primary mr-2"></i>PDF预览 | PDF Preview
+            </h2>
+            <div id="previewContent" class="border border-gray-300 p-4 bg-white rounded-lg overflow-hidden"></div>
+        </div>
+    </div>
+    
+    <!-- 相机模态框 -->
+    <div id="cameraModal" class="fixed inset-0 bg-black bg-opacity-90 flex flex-col z-50 hidden">
+        <div class="flex justify-between items-center p-4 text-white">
+            <h3 class="text-lg font-semibold">拍摄照片 | Take Photo</h3>
+            <div>
+                <button id="switchCamera" class="text-white hover:text-gray-300 mr-4">
+                    <i class="fa fa-refresh text-xl"></i>
+                </button>
+                <button id="closeCamera" class="text-white hover:text-gray-300">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex-1 relative">
+            <video id="cameraPreview" class="w-full h-full object-cover"></video>
+            <canvas id="canvas" class="hidden absolute top-0 left-0 w-full h-full"></canvas>
+            
+            <!-- 相机遮罩框 - 帮助用户对准拍摄区域 -->
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3/4 h-2/3 border-2 border-white/50 rounded-lg pointer-events-none">
+                <div class="absolute -top-1 -left-1 w-2 h-2 bg-white"></div>
+                <div class="absolute -top-1 -right-1 w-2 h-2 bg-white"></div>
+                <div class="absolute -bottom-1 -left-1 w-2 h-2 bg-white"></div>
+                <div class="absolute -bottom-1 -right-1 w-2 h-2 bg-white"></div>
+            </div>
+        </div>
+        
+        <div class="p-6 text-center">
+            <div id="capturePhoto" class="camera-shutter mb-4"></div>
+            <div class="flex justify-center gap-6 mt-2">
+                <button id="retakePhoto" class="text-white bg-gray-700/50 hover:bg-gray-700/80 py-2 px-4 rounded-lg transition-all hidden">
+                    <i class="fa fa-refresh mr-2"></i> 重拍 | Retake
+                </button>
+                <button id="savePhoto" class="text-white bg-green-600 hover:bg-green-700 py-2 px-6 rounded-lg transition-all hidden">
+                    <i class="fa fa-check mr-2"></i> 保存照片 | Save Photo
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 缩放比例设置模态框 -->
+    <div id="scaleModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50 modal-backdrop"></div>
+        <div class="relative bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <h3 class="text-xl font-bold text-center mb-4">设置PDF缩放比例</h3>
+            <p class="text-gray-600 mb-6 text-center">请输入缩放比例（大于0的数值，例如0.2表示20%）</p>
+            
+            <div class="mb-6">
+                <div class="flex items-center gap-3">
+                    <input type="number" id="scaleInput" 
+                           class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                           min="0.01" step="0.01" value="1.0">
+                    <span class="text-gray-700 font-medium">×</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">提示：手机用户建议使用0.2-0.5之间的比例以获得更好的排版效果</p>
+            </div>
+            
+            <div class="flex gap-4">
+                <button type="button" id="cancelScaleBtn" 
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg transition-all duration-300">
+                    取消 | Cancel
+                </button>
+                <button type="button" id="confirmScaleBtn" 
+                        class="flex-1 bg-primary hover:bg-blue-600 text-white py-3 px-6 rounded-lg transition-all duration-300">
+                    确认 | Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let roomCount = 1;
+        let stream = null;
+        let totalPages = 0;
+        let currentCamera = 'environment'; // 默认使用后置摄像头
+        let currentSection = null;
+        
+        // DOM元素
+        const formContainer = document.getElementById('formContainer');
+        const addRoomBtn = document.getElementById('addRoomBtn');
+        const generatePdfBtn = document.getElementById('generatePdfBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const cameraModal = document.getElementById('cameraModal');
+        const cameraPreview = document.getElementById('cameraPreview');
+        const canvas = document.getElementById('canvas');
+        const capturePhotoBtn = document.getElementById('capturePhoto');
+        const retakePhotoBtn = document.getElementById('retakePhoto');
+        const savePhotoBtn = document.getElementById('savePhoto');
+        const closeCameraBtn = document.getElementById('closeCamera');
+        const switchCameraBtn = document.getElementById('switchCamera');
+        const importLayoutBtn = document.getElementById('importLayoutBtn');
+        const roomLayoutInput = document.getElementById('roomLayoutInput');
+        const scaleModal = document.getElementById('scaleModal');
+        const scaleInput = document.getElementById('scaleInput');
+        const confirmScaleBtn = document.getElementById('confirmScaleBtn');
+        const cancelScaleBtn = document.getElementById('cancelScaleBtn');
+        
+        // 检测是否为安卓设备
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        
+        // 添加新房间
+        addRoomBtn.addEventListener('click', () => {
+            addNewRoom();
+        });
+        
+        // 添加新房间函数
+        function addNewRoom(roomName = '') {
+            const newForm = document.createElement('div');
+            newForm.className = 'room-form bg-white rounded-xl p-6 form-shadow card-hover';
+            newForm.setAttribute('data-room-id', roomCount);
+            
+            newForm.innerHTML = `
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-semibold text-dark flex items-center">
+                            <i class="fa fa-building-o text-primary mr-2"></i>房间信息 | Room Information
+                        </h2>
+                        <p class="text-gray-500 text-sm">添加房间及其包含的部分 | Add room and its sections</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" class="add-section-btn bg-secondary hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-all duration-300 flex items-center">
+                            <i class="fa fa-plus mr-2"></i> 添加部分 | Add Section
+                        </button>
+                        <button type="button" class="remove-room-btn text-danger hover:text-red-700 transition-colors duration-300" 
+                                onclick="removeRoom(this)">
+                            <i class="fa fa-trash-o text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        房间名称 | Room Name
+                    </label>
+                    <input type="text" class="room-name" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                           placeholder="例如：厨房 | Example: Kitchen" value="${roomName}">
+                </div>
+                
+                <!-- 部分列表 -->
+                <div class="sections-container space-y-6">
+                    <!-- 初始部分 -->
+                    <div class="section-item p-4 border border-gray-200 rounded-lg">
+                        <div class="flex justify-between items-start mb-4">
+                            <label class="block text-sm font-medium text-gray-700">
+                                部分名称 | Section Name
+                            </label>
+                            <button type="button" class="remove-section-btn text-danger hover:text-red-700 transition-colors duration-300" 
+                                    onclick="removeSection(this)">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <input type="text" class="section-name" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                                       placeholder="例如：墙壁 | Example: Walls" value="">
+                            </div>
+                            
+                            <!-- 问题类型选择 -->
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    问题类型 | Issue Type
+                                </label>
+                                <select class="issue-type" 
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300">
+                                    <option value="">无问题 | No Issue</option>
+                                    <option value="Needs Cleaning">需要清洁 (Needs Cleaning)</option>
+                                    <option value="Needs Painting">需要粉刷 (Needs Painting)</option>
+                                    <option value="Needs Repair">需要维修 (Needs Repair)</option>
+                                    <option value="Scratched">有刮痕 (Scratched)</option>
+                                    <option value="Needs Spot Cleaning">需要污点清洗 (Needs Spot Cleaning)</option>
+                                    <option value="Needs Spot Painting">需要污点粉刷 (Needs Spot Painting)</option>
+                                    <option value="Needs Replacing">需要更换 (Needs Replacing)</option>
+                                    <option value="Heavily Used">存在影响物品寿命的明显磨损 (Heavily Used)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 备注信息 -->
+                            <div class="space-y-2 md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    备注信息 | Notes
+                                </label>
+                                <textarea class="notes" rows="2" 
+                                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                                          placeholder="请输入详细描述... | Enter detailed description..."></textarea>
+                            </div>
+                            
+                            <!-- 图片上传/拍摄 -->
+                            <div class="space-y-2 md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    现场照片 | Photos
+                                </label>
+                                <div class="flex flex-wrap gap-4">
+                                    <div class="flex-1 min-w-[200px]">
+                                        <button type="button" onclick="openCamera(this)" 
+                                                class="w-full bg-primary hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center">
+                                            <i class="fa fa-camera mr-2"></i> 拍摄照片 | Take Photo
+                                        </button>
+                                        <!-- 安卓备用方案 -->
+                                        <input type="file" accept="image/*" capture="environment" class="hidden android-camera-fallback">
+                                    </div>
+                                    <div class="flex-1 min-w-[200px]">
+                                        <label class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center cursor-pointer">
+                                            <i class="fa fa-upload mr-2"></i> 上传图片 | Upload Image
+                                            <input type="file" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 图片预览区域 -->
+                                <div class="image-preview mt-3 flex flex-wrap gap-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            formContainer.appendChild(newForm);
+            
+            // 为添加部分按钮绑定事件
+            newForm.querySelector('.add-section-btn').addEventListener('click', function() {
+                addNewSection(this.closest('.room-form'));
+            });
+            
+            // 更新删除按钮状态
+            updateRemoveButtons();
+            
+            roomCount++;
+            
+            // 添加动画效果
+            newForm.style.opacity = '0';
+            newForm.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                newForm.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                newForm.style.opacity = '1';
+                newForm.style.transform = 'translateY(0)';
+            }, 10);
+            
+            return newForm;
+        }
+        
+        // 添加新部分
+        function addNewSection(roomForm, sectionName = '') {
+            const sectionsContainer = roomForm.querySelector('.sections-container');
+            const sectionItems = sectionsContainer.querySelectorAll('.section-item');
+            
+            const newSection = document.createElement('div');
+            newSection.className = 'section-item p-4 border border-gray-200 rounded-lg';
+            
+            newSection.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <label class="block text-sm font-medium text-gray-700">
+                        部分名称 | Section Name
+                    </label>
+                    <button type="button" class="remove-section-btn text-danger hover:text-red-700 transition-colors duration-300" 
+                            onclick="removeSection(this)">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <input type="text" class="section-name" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                               placeholder="例如：墙壁 | Example: Walls" value="${sectionName}">
+                    </div>
+                    
+                    <!-- 问题类型选择 -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">
+                            问题类型 | Issue Type
+                        </label>
+                        <select class="issue-type" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300">
+                            <option value="">无问题 | No Issue</option>
+                            <option value="Needs Cleaning">需要清洁 (Needs Cleaning)</option>
+                            <option value="Needs Painting">需要粉刷 (Needs Painting)</option>
+                            <option value="Needs Repair">需要维修 (Needs Repair)</option>
+                            <option value="Scratched">有刮痕 (Scratched)</option>
+                            <option value="Needs Spot Cleaning">需要污点清洗 (Needs Spot Cleaning)</option>
+                            <option value="Needs Spot Painting">需要污点粉刷 (Needs Spot Painting)</option>
+                            <option value="Needs Replacing">需要更换 (Needs Replacing)</option>
+                            <option value="Heavily Used">存在影响物品寿命的明显磨损 (Heavily Used)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 备注信息 -->
+                    <div class="space-y-2 md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">
+                            备注信息 | Notes
+                        </label>
+                        <textarea class="notes" rows="2" 
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300"
+                                  placeholder="请输入详细描述... | Enter detailed description..."></textarea>
+                    </div>
+                    
+                    <!-- 图片上传/拍摄 -->
+                    <div class="space-y-2 md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">
+                            现场照片 | Photos
+                        </label>
+                        <div class="flex flex-wrap gap-4">
+                            <div class="flex-1 min-w-[200px]">
+                                <button type="button" onclick="openCamera(this)" 
+                                        class="w-full bg-primary hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center">
+                                    <i class="fa fa-camera mr-2"></i> 拍摄照片 | Take Photo
+                                </button>
+                                <!-- 安卓备用方案 -->
+                                <input type="file" accept="image/*" capture="environment" class="hidden android-camera-fallback">
+                            </div>
+                            <div class="flex-1 min-w-[200px]">
+                                <label class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center cursor-pointer">
+                                    <i class="fa fa-upload mr-2"></i> 上传图片 | Upload Image
+                                    <input type="file" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 图片预览区域 -->
+                        <div class="image-preview mt-3 flex flex-wrap gap-3"></div>
+                    </div>
+                </div>
+            `;
+            
+            sectionsContainer.appendChild(newSection);
+            
+            // 更新部分删除按钮状态
+            updateSectionRemoveButtons(sectionsContainer);
+            
+            // 添加动画效果
+            newSection.style.opacity = '0';
+            setTimeout(() => {
+                newSection.style.transition = 'opacity 0.3s ease';
+                newSection.style.opacity = '1';
+            }, 10);
+        }
+        
+        // 删除房间
+        function removeRoom(button) {
+            const form = button.closest('.room-form');
+            
+            // 添加删除动画
+            form.style.opacity = '0';
+            form.style.transform = 'translateY(20px)';
+            form.style.height = form.offsetHeight + 'px';
+            
+            setTimeout(() => {
+                form.style.overflow = 'hidden';
+                form.style.height = '0';
+                form.style.margin = '0';
+                form.style.padding = '0';
+                
+                setTimeout(() => {
+                    form.remove();
+                    updateRemoveButtons();
+                }, 300);
+            }, 300);
+        }
+        
+        // 删除部分
+        function removeSection(button) {
+            const section = button.closest('.section-item');
+            const sectionsContainer = section.closest('.sections-container');
+            
+            // 添加删除动画
+            section.style.opacity = '0';
+            
+            setTimeout(() => {
+                section.remove();
+                updateSectionRemoveButtons(sectionsContainer);
+            }, 300);
+        }
+        
+        // 更新房间删除按钮状态（至少保留一个房间）
+        function updateRemoveButtons() {
+            const forms = document.querySelectorAll('.room-form');
+            const removeBtns = document.querySelectorAll('.remove-room-btn');
+            
+            if (forms.length <= 1) {
+                removeBtns.forEach(btn => btn.classList.add('hidden'));
+            } else {
+                removeBtns.forEach(btn => btn.classList.remove('hidden'));
+            }
+        }
+        
+        // 更新部分删除按钮状态（至少保留一个部分）
+        function updateSectionRemoveButtons(sectionsContainer) {
+            const sections = sectionsContainer.querySelectorAll('.section-item');
+            const removeBtns = sectionsContainer.querySelectorAll('.remove-section-btn');
+            
+            if (sections.length <= 1) {
+                removeBtns.forEach(btn => btn.classList.add('hidden'));
+            } else {
+                removeBtns.forEach(btn => btn.classList.remove('hidden'));
+            }
+        }
+        
+        // 导入房间布局
+        importLayoutBtn.addEventListener('click', () => {
+            const layoutText = roomLayoutInput.value.trim();
+            if (!layoutText) {
+                showMessage('请输入房间布局 | Please enter room layout', 'error');
+                return;
+            }
+            
+            try {
+                // 清空现有房间（保留第一个作为基础）
+                const existingRooms = document.querySelectorAll('.room-form');
+                for (let i = 1; i < existingRooms.length; i++) {
+                    existingRooms[i].remove();
+                }
+                
+                // 解析布局文本
+                // 正则表达式匹配房间名称和部分列表
+                const roomRegex = /([^[\]]+)\[([^[\]]+)\]/g;
+                let match;
+                let firstRoomProcessed = false;
+                const firstRoom = existingRooms[0];
+                
+                // 清空第一个房间的部分（保留一个空部分）
+                if (firstRoom) {
+                    const sectionsContainer = firstRoom.querySelector('.sections-container');
+                    const sections = sectionsContainer.querySelectorAll('.section-item');
+                    for (let i = 1; i < sections.length; i++) {
+                        sections[i].remove();
+                    }
+                    // 清空第一个部分的内容
+                    const firstSection = sections[0];
+                    firstSection.querySelector('.section-name').value = '';
+                    firstSection.querySelector('.issue-type').value = '';
+                    firstSection.querySelector('.notes').value = '';
+                    firstSection.querySelector('.image-preview').innerHTML = '';
+                }
+                
+                // 解析每个房间
+                while ((match = roomRegex.exec(layoutText)) !== null) {
+                    const roomName = match[1].trim();
+                    const sections = match[2].split('/').map(s => s.trim());
+                    
+                    let roomElement;
+                    
+                    if (!firstRoomProcessed && firstRoom) {
+                        // 使用第一个现有房间
+                        roomElement = firstRoom;
+                        roomElement.querySelector('.room-name').value = roomName;
+                        firstRoomProcessed = true;
+                    } else {
+                        // 创建新房间
+                        roomElement = addNewRoom(roomName);
+                    }
+                    
+                    // 清空房间的现有部分（保留一个）
+                    const sectionsContainer = roomElement.querySelector('.sections-container');
+                    const existingSections = sectionsContainer.querySelectorAll('.section-item');
+                    for (let i = 1; i < existingSections.length; i++) {
+                        existingSections[i].remove();
+                    }
+                    
+                    // 设置第一个部分
+                    if (sections.length > 0) {
+                        existingSections[0].querySelector('.section-name').value = sections[0];
+                        
+                        // 添加剩余部分
+                        for (let i = 1; i < sections.length; i++) {
+                            addNewSection(roomElement, sections[i]);
+                        }
+                    }
+                }
+                
+                showMessage('房间布局导入成功 | Room layout imported successfully', 'success');
+                roomLayoutInput.value = '';
+            } catch (error) {
+                console.error('布局导入错误:', error);
+                showMessage('布局格式错误，请检查输入 | Layout format error, please check input', 'error');
+            }
+        });
+        
+        // 打开相机 - 针对安卓设备做了特殊处理
+        function openCamera(button) {
+            currentSection = button.closest('.section-item');
+            
+            // 对于安卓设备，先尝试使用标准API，如果失败则使用文件输入作为备用方案
+            if (isAndroid) {
+                tryStandardCameraAPI().catch(err => {
+                    console.log('标准相机API失败，尝试备用方案:', err);
+                    useAndroidCameraFallback(button);
+                });
+            } else {
+                // 非安卓设备直接使用标准API
+                tryStandardCameraAPI();
+            }
+        }
+        
+        // 尝试标准相机API
+        async function tryStandardCameraAPI() {
+            cameraModal.classList.remove('hidden');
+            
+            // 停止任何现有流
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            
+            try {
+                // 配置相机参数，优先使用后置摄像头
+                const constraints = {
+                    video: {
+                        facingMode: currentCamera,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        aspectRatio: { ideal: 16/9 }
+                    },
+                    audio: false
+                };
+                
+                // 对于安卓设备，添加额外的约束以提高兼容性
+                if (isAndroid) {
+                    constraints.video.advanced = [{
+                        focusMode: 'continuous-picture'
+                    }];
+                }
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                cameraPreview.srcObject = stream;
+                
+                // 等待视频准备就绪
+                await new Promise(resolve => {
+                    cameraPreview.onloadedmetadata = resolve;
+                });
+                
+                // 重置状态
+                canvas.classList.add('hidden');
+                cameraPreview.classList.remove('hidden');
+                capturePhotoBtn.classList.remove('hidden');
+                retakePhotoBtn.classList.add('hidden');
+                savePhotoBtn.classList.add('hidden');
+                
+                // 横屏提示
+                if (window.innerWidth < window.innerHeight) {
+                    showMessage('建议切换到横屏模式以获得更好的拍摄体验 | It is recommended to switch to landscape mode for better shooting experience', 'info');
+                }
+                
+            } catch (error) {
+                console.error('相机访问错误:', error);
+                cameraModal.classList.add('hidden');
+                throw error; // 让调用者处理错误
+            }
+        }
+        
+        // 安卓设备相机备用方案
+        function useAndroidCameraFallback(button) {
+            // 找到当前部分中的备用文件输入并触发它
+            const fallbackInput = button.nextElementSibling;
+            if (fallbackInput && fallbackInput.classList.contains('android-camera-fallback')) {
+                // 监听文件选择事件
+                fallbackInput.onchange = function(e) {
+                    if (e.target.files && e.target.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const previewContainer = currentSection.querySelector('.image-preview');
+                            
+                            // 创建图片预览元素
+                            const imgContainer = document.createElement('div');
+                            imgContainer.className = 'relative group';
+                            
+                            const img = document.createElement('img');
+                            img.src = event.target.result;
+                            img.className = 'h-32 w-auto object-cover rounded-lg border border-gray-200';
+                            img.alt = '房间照片 | Room photo';
+                            
+                            // 删除按钮
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.type = 'button';
+                            deleteBtn.className = 'absolute -top-3 -right-3 bg-danger text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300';
+                            deleteBtn.innerHTML = '<i class="fa fa-times"></i>';
+                            deleteBtn.onclick = () => imgContainer.remove();
+                            
+                            imgContainer.appendChild(img);
+                            imgContainer.appendChild(deleteBtn);
+                            previewContainer.appendChild(imgContainer);
+                            
+                            // 添加动画
+                            imgContainer.style.opacity = '0';
+                            setTimeout(() => {
+                                imgContainer.style.transition = 'opacity 0.3s ease';
+                                imgContainer.style.opacity = '1';
+                            }, 10);
+                        };
+                        reader.readAsDataURL(e.target.files[0]);
+                    }
+                    // 重置输入，允许再次选择
+                    fallbackInput.value = '';
+                };
+                
+                // 触发文件选择
+                fallbackInput.click();
+            } else {
+                showMessage('无法访问相机，请尝试使用上传图片功能 | Unable to access camera, please try uploading images', 'error');
+            }
+        }
+        
+        // 切换前后摄像头
+        switchCameraBtn.addEventListener('click', () => {
+            currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+            tryStandardCameraAPI().catch(err => {
+                console.error('切换摄像头失败:', err);
+                showMessage('切换摄像头失败 | Failed to switch camera', 'error');
+            });
+        });
+        
+        // 关闭相机
+        closeCameraBtn.addEventListener('click', closeCamera);
+        
+        function closeCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            cameraModal.classList.add('hidden');
+        }
+        
+        // 拍摄照片
+        capturePhotoBtn.addEventListener('click', () => {
+            const ctx = canvas.getContext('2d');
+            // 设置canvas尺寸与视频相同
+            canvas.width = cameraPreview.videoWidth;
+            canvas.height = cameraPreview.videoHeight;
+            
+            // 绘制视频帧到canvas
+            ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
+            
+            // 切换显示
+            cameraPreview.classList.add('hidden');
+            canvas.classList.remove('hidden');
+            capturePhotoBtn.classList.add('hidden');
+            retakePhotoBtn.classList.remove('hidden');
+            savePhotoBtn.classList.remove('hidden');
+        });
+        
+        // 重拍照片
+        retakePhotoBtn.addEventListener('click', () => {
+            cameraPreview.classList.remove('hidden');
+            canvas.classList.add('hidden');
+            capturePhotoBtn.classList.remove('hidden');
+            retakePhotoBtn.classList.add('hidden');
+            savePhotoBtn.classList.add('hidden');
+        });
+        
+        // 保存照片
+        savePhotoBtn.addEventListener('click', () => {
+            const imageData = canvas.toDataURL('image/jpeg');
+            const previewContainer = currentSection.querySelector('.image-preview');
+            
+            // 创建图片预览元素
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'relative group';
+            
+            const img = document.createElement('img');
+            img.src = imageData;
+            img.className = 'h-32 w-auto object-cover rounded-lg border border-gray-200';
+            img.alt = '房间照片 | Room photo';
+            
+            // 删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'absolute -top-3 -right-3 bg-danger text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300';
+            deleteBtn.innerHTML = '<i class="fa fa-times"></i>';
+            deleteBtn.onclick = () => imgContainer.remove();
+            
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(deleteBtn);
+            previewContainer.appendChild(imgContainer);
+            
+            // 添加图片时的动画
+            imgContainer.style.opacity = '0';
+            imgContainer.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                imgContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                imgContainer.style.opacity = '1';
+                imgContainer.style.transform = 'scale(1)';
+            }, 10);
+            
+            closeCamera();
+        });
+        
+        // 预览上传的图片
+        function previewImage(input) {
+            const sectionItem = input.closest('.section-item');
+            const previewContainer = sectionItem.querySelector('.image-preview');
+            
+            for (let i = 0; i < input.files.length; i++) {
+                const file = input.files[i];
+                if (!file.type.match('image.*')) continue;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // 创建图片预览元素
+                    const imgContainer = document.createElement('div');
+                    imgContainer.className = 'relative group';
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'h-32 w-auto object-cover rounded-lg border border-gray-200';
+                    img.alt = '上传的房间照片 | Uploaded room photo';
+                    
+                    // 删除按钮
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'absolute -top-3 -right-3 bg-danger text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300';
+                    deleteBtn.innerHTML = '<i class="fa fa-times"></i>';
+                    deleteBtn.onclick = () => imgContainer.remove();
+                    
+                    imgContainer.appendChild(img);
+                    imgContainer.appendChild(deleteBtn);
+                    previewContainer.appendChild(imgContainer);
+                    
+                    // 添加图片时的动画
+                    imgContainer.style.opacity = '0';
+                    imgContainer.style.transform = 'scale(0.9)';
+                    setTimeout(() => {
+                        imgContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        imgContainer.style.opacity = '1';
+                        imgContainer.style.transform = 'scale(1)';
+                    }, 10);
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            // 重置input值，允许重复选择同一文件
+            input.value = '';
+        }
+        
+        // 获取问题类型的颜色类
+        function getIssueTypeColor(issueType) {
+            // 绿色 - 无问题
+            if (!issueType) return 'text-green-600 bg-green-50 border-green-200';
+            
+            // 黄色 - 需要清洁、有刮痕、存在磨损
+            const yellowTypes = ['Needs Cleaning', 'Scratched', 'Heavily Used', 'Needs Spot Cleaning'];
+            if (yellowTypes.includes(issueType)) {
+                return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+            }
+            
+            // 红色 - 其他问题类型
+            return 'text-red-600 bg-red-50 border-red-200';
+        }
+        
+        // 获取问题类型的显示文本
+        function getIssueTypeText(issueType) {
+            const typeMap = {
+                '': '无问题 | No Issue',
+                'Needs Cleaning': '需要清洁 (Needs Cleaning)',
+                'Needs Painting': '需要粉刷 (Needs Painting)',
+                'Needs Repair': '需要维修 (Needs Repair)',
+                'Scratched': '有刮痕 (Scratched)',
+                'Needs Spot Cleaning': '需要污点清洗 (Needs Spot Cleaning)',
+                'Needs Spot Painting': '需要污点粉刷 (Needs Spot Painting)',
+                'Needs Replacing': '需要更换 (Needs Replacing)',
+                'Heavily Used': '存在影响物品寿命的明显磨损 (Heavily Used)'
+            };
+            return typeMap[issueType] || issueType;
+        }
+        
+        // 判断部分是否有问题
+        function hasIssue(section) {
+            const issueType = section.querySelector('.issue-type').value;
+            const notes = section.querySelector('.notes').value.trim();
+            const images = section.querySelectorAll('.image-preview img');
+            
+            return !!issueType || !!notes || images.length > 0;
+        }
+        
+        // 打开缩放比例设置模态框
+        generatePdfBtn.addEventListener('click', () => {
+            scaleModal.classList.remove('hidden');
+            // 为移动设备设置默认建议值
+            if (window.innerWidth < 768 && scaleInput.value === "1.0") {
+                scaleInput.value = "0.3";
+            }
+        });
+        
+        // 关闭缩放比例设置模态框
+        cancelScaleBtn.addEventListener('click', () => {
+            scaleModal.classList.add('hidden');
+        });
+        
+        // 点击模态框背景关闭
+        scaleModal.querySelector('.modal-backdrop').addEventListener('click', () => {
+            scaleModal.classList.add('hidden');
+        });
+        
+        // 确认缩放比例并生成PDF
+        confirmScaleBtn.addEventListener('click', async () => {
+            const scale = parseFloat(scaleInput.value);
+            
+            // 验证缩放比例
+            if (isNaN(scale) || scale <= 0) {
+                showMessage('请输入有效的缩放比例（大于0） | Please enter a valid scale (greater than 0)', 'error');
+                return;
+            }
+            
+            // 关闭模态框
+            scaleModal.classList.add('hidden');
+            
+            // 生成PDF
+            await generatePDFWithScale(scale);
+        });
+        
+        // 带缩放比例的PDF生成函数
+        async function generatePDFWithScale(scale) {
+            showMessage('正在生成PDF报告... | Generating PDF report...', 'info');
+            
+            try {
+                // 创建PDF预览内容
+                const previewContent = document.getElementById('previewContent');
+                previewContent.innerHTML = createReportHTML();
+                document.getElementById('pdfPreview').classList.remove('hidden');
+                
+                // 滚动到预览区域
+                document.getElementById('pdfPreview').scrollIntoView({ behavior: 'smooth' });
+                
+                // 使用html2canvas和jsPDF生成PDF
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const margin = 15; // 页边距
+                
+                // 创建临时报告元素用于PDF生成
+                const reportElement = document.createElement('div');
+                reportElement.innerHTML = createReportHTML();
+                reportElement.className = 'p-8 bg-white max-w-full';
+                // 应用缩放比例到报告元素
+                const contentWidth = (210 - margin * 2) / scale; // A4宽度减去两边边距，根据缩放比例调整
+                reportElement.style.width = contentWidth + 'mm';
+                reportElement.style.transform = `scale(${scale})`;
+                reportElement.style.transformOrigin = 'top center';
+                reportElement.style.margin = '0 auto';
+                document.body.appendChild(reportElement);
+                
+                // 计算总页数
+                await html2canvas(reportElement, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(canvas => {
+                    const imgWidth = 210 - margin * 2; // 内容宽度
+                    const pageHeight = 297 - margin * 2; // 内容高度
+                    const imgHeight = canvas.height * imgWidth / canvas.width;
+                    totalPages = Math.ceil(imgHeight / pageHeight);
+                });
+                
+                // 生成带页码的PDF
+                await html2canvas(reportElement, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const imgWidth = 210 - margin * 2; // 内容宽度
+                    const pageHeight = 297 - margin * 2; // 内容高度
+                    const imgHeight = canvas.height * imgWidth / canvas.width;
+                    
+                    let heightLeft = imgHeight;
+                    let position = 0;
+                    let pageNum = 1;
+                    
+                    // 添加第一页
+                    doc.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
+                    addPageFooter(doc, pageNum);
+                    heightLeft -= pageHeight;
+                    pageNum++;
+                    
+                    // 如果内容超过一页，添加更多页面
+                    while (heightLeft > 0) {
+                        position = margin - (imgHeight - heightLeft);
+                        doc.addPage();
+                        doc.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+                        addPageFooter(doc, pageNum);
+                        heightLeft -= pageHeight;
+                        pageNum++;
+                    }
+                    
+                    // 保存PDF
+                    const address = document.getElementById('propertyAddress').value || '房屋检查报告';
+                    const sanitizedAddress = address.replace(/[\\/*?:"<>|]/g, '-'); // 移除文件名中的非法字符
+                    doc.save(`${sanitizedAddress}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
+                    showMessage('PDF报告生成成功！ | PDF report generated successfully!', 'success');
+                });
+                
+                // 清理临时元素
+                document.body.removeChild(reportElement);
+                
+            } catch (error) {
+                console.error('PDF生成错误:', error);
+                showMessage('生成PDF失败: ' + error.message + ' | Failed to generate PDF: ' + error.message, 'error');
+            }
+        }
+        
+        // 添加页脚
+        function addPageFooter(doc, pageNum) {
+            const pageWidth = 210; // A4宽度(mm)
+            const footerText = `第 ${pageNum} 页，共 ${totalPages} 页 | Page ${pageNum} of ${totalPages} | 生成日期: ${new Date().toLocaleString()}`;
+            
+            doc.setFontSize(8);
+            doc.setTextColor(100);
+            doc.text(footerText, pageWidth / 2, 290, { align: 'center' });
+        }
+        
+        // 创建报告HTML内容
+        function createReportHTML() {
+            const roomForms = document.querySelectorAll('.room-form');
+            const address = document.getElementById('propertyAddress').value || '未填写地址 | Not specified';
+            const inspectionDate = document.getElementById('inspectionDate').value || new Date().toISOString().split('T')[0];
+            const inspector = document.getElementById('inspectorName').value || '未填写 | Not specified';
+            const propertyType = document.getElementById('propertyType').options[document.getElementById('propertyType').selectedIndex]?.text || '未指定 | Not specified';
+            
+            let reportHTML = `
+                <div class="pdf-header pb-6 mb-8">
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl font-bold mb-3 text-primary">房屋检查报告</h1>
+                        <p class="text-xl text-gray-600 mb-1">PROPERTY INSPECTION REPORT</p>
+                        <div class="w-40 h-0.5 bg-primary mx-auto mt-2"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                        <div class="space-y-2">
+                            <p><strong>房屋地址：</strong> ${address}</p>
+                            <p><strong>Property Address：</strong> ${address}</p>
+                        </div>
+                        <div class="space-y-2">
+                            <p><strong>检查日期：</strong> ${inspectionDate}</p>
+                            <p><strong>Inspection Date：</strong> ${inspectionDate}</p>
+                        </div>
+                        <div class="space-y-2">
+                            <p><strong>房屋类型：</strong> ${propertyType}</p>
+                            <p><strong>Property Type：</strong> ${propertyType.split(' | ')[1] || propertyType}</p>
+                        </div>
+                        <div class="space-y-2">
+                            <p><strong>检查人员：</strong> ${inspector}</p>
+                            <p><strong>Inspector：</strong> ${inspector}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-10">
+            `;
+            
+            roomForms.forEach((roomForm, roomIndex) => {
+                const roomName = roomForm.querySelector('.room-name').value || `未命名房间 ${roomIndex + 1} | Unnamed Room ${roomIndex + 1}`;
+                const sections = roomForm.querySelectorAll('.section-item');
+                
+                // 分离有问题和无问题的部分
+                const problematicSections = [];
+                const normalSections = [];
+                
+                sections.forEach(section => {
+                    if (hasIssue(section)) {
+                        problematicSections.push(section);
+                    } else {
+                        normalSections.push(section);
+                    }
+                });
+                
+                reportHTML += `
+                    <div class="pdf-card">
+                        <div class="bg-gray-50 px-6 py-4 border-b">
+                            <h2 class="text-xl font-bold text-gray-800">${roomName}</h2>
+                        </div>
+                        <div class="p-6">
+                `;
+                
+                // 无问题的部分 - 浓缩显示
+                if (normalSections.length > 0) {
+                    let normalSectionsText = '';
+                    normalSections.forEach(section => {
+                        const sectionName = section.querySelector('.section-name').value || `未命名部分 | Unnamed Section`;
+                        normalSectionsText += `${sectionName}; `;
+                    });
+                    
+                    reportHTML += `
+                        <div class="mb-8 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p class="font-medium text-green-700">
+                                <i class="fa fa-check-circle mr-2"></i>无问题部分 | Sections with No Issues
+                            </p>
+                            <p class="text-green-800 mt-1">${normalSectionsText}</p>
+                        </div>
+                    `;
+                }
+                
+                // 有问题的部分 - 详细显示
+                if (problematicSections.length > 0) {
+                    reportHTML += `<div class="space-y-6">`;
+                    
+                    problematicSections.forEach((section, sectionIndex) => {
+                        const sectionName = section.querySelector('.section-name').value || `未命名部分 ${sectionIndex + 1} | Unnamed Section ${sectionIndex + 1}`;
+                        const issueType = section.querySelector('.issue-type').value;
+                        const notes = section.querySelector('.notes').value || '无备注 | No notes';
+                        const images = section.querySelectorAll('.image-preview img');
+                        
+                        const colorClass = getIssueTypeColor(issueType);
+                        const issueTypeText = getIssueTypeText(issueType);
+                        
+                        let imagesHTML = '';
+                        if (images.length > 0) {
+                            images.forEach((img, imgIndex) => {
+                                imagesHTML += `
+                                    <div class="inline-block m-2 border border-gray-200 p-1 rounded bg-white">
+                                        <img src="${img.src}" alt="${sectionName} 照片 ${imgIndex + 1}" 
+                                             style="max-height: 100px; max-width: 140px; object-fit: cover;">
+                                        <p class="text-xs text-center mt-1 text-gray-500">照片 ${imgIndex + 1} | Photo ${imgIndex + 1}</p>
+                                    </div>
+                                `;
+                            });
+                        }
+                        
+                        reportHTML += `
+                            <div class="border ${colorClass} rounded-lg overflow-hidden">
+                                <div class="px-4 py-3 bg-opacity-50 border-b ${colorClass.replace('text-', 'bg-').replace('border-', 'bg-')}">
+                                    <h3 class="font-semibold ${colorClass.split(' ')[0]}">${sectionName}</h3>
+                                </div>
+                                <div class="p-4">
+                                    <div class="mb-3">
+                                        <p class="text-sm font-medium text-gray-700 mb-1">问题类型 | Issue Type</p>
+                                        <p class="${colorClass.split(' ')[0]}">${issueTypeText}</p>
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <p class="text-sm font-medium text-gray-700 mb-1">详细描述 | Detailed Description</p>
+                                        <p class="text-gray-800 whitespace-pre-line">${notes}</p>
+                                    </div>
+                                    
+                                    ${images.length > 0 ? `
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-700 mb-2">现场照片 | Photos</p>
+                                        <div class="flex flex-wrap">${imagesHTML}</div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    reportHTML += `</div>`;
+                }
+                
+                // 如果所有部分都正常
+                if (problematicSections.length === 0 && normalSections.length > 0) {
+                    reportHTML += `
+                        <div class="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                            <p class="text-green-700"><i class="fa fa-check-circle mr-2"></i>该房间所有部分均无问题 | All sections in this room are in good condition</p>
+                        </div>
+                    `;
+                }
+                
+                reportHTML += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            reportHTML += `
+                </div>
+                <div class="pdf-footer mt-10 pt-4 text-center">
+                    <p>本报告由房屋检查系统自动生成 | This report is automatically generated by the Property Inspection System</p>
+                    <p class="mt-1">报告生成时间：${new Date().toLocaleString()} | Report generated on: ${new Date().toLocaleString()}</p>
+                </div>
+            `;
+            return reportHTML;
+        }
+        
+        // 显示状态消息
+        function showMessage(text, type = 'info') {
+            statusMessage.textContent = text;
+            statusMessage.className = 'mt-6 text-center px-4 py-3 rounded-lg';
+            
+            switch(type) {
+                case 'success':
+                    statusMessage.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-200');
+                    break;
+                case 'error':
+                    statusMessage.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-200');
+                    break;
+                default:
+                    statusMessage.classList.add('bg-blue-100', 'text-blue-800', 'border', 'border-blue-200');
+            }
+            
+            statusMessage.classList.remove('hidden');
+            
+            // 5秒后自动隐藏信息（成功和信息类型）
+            if (type !== 'error') {
+                setTimeout(() => {
+                    statusMessage.style.opacity = '0';
+                    setTimeout(() => {
+                        statusMessage.classList.add('hidden');
+                        statusMessage.style.opacity = '1';
+                    }, 300);
+                }, 5000);
+            }
+        }
+        
+        // 初始化页面，设置默认日期和事件监听
+        document.addEventListener('DOMContentLoaded', () => {
+            // 设置默认检查日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('inspectionDate').value = today;
+            
+            // 为初始房间的添加部分按钮绑定事件
+            document.querySelector('.add-section-btn').addEventListener('click', function() {
+                addNewSection(this.closest('.room-form'));
+            });
+            
+            // 更新删除按钮状态
+            updateRemoveButtons();
+            const firstSectionsContainer = document.querySelector('.sections-container');
+            if (firstSectionsContainer) {
+                updateSectionRemoveButtons(firstSectionsContainer);
+            }
+            
+            // 安卓设备提示
+            if (isAndroid) {
+                showMessage('提示：如相机无法正常使用，请尝试使用上传图片功能 | Note: If camera is unavailable, please try uploading images', 'info');
+            }
+        });
+    </script>
 </body>
 </html>
